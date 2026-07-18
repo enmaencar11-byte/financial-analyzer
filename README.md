@@ -2,13 +2,13 @@
 
 
 
-\*\*ES\*\* | Sistema automatizado de análisis financiero aplicado a emisores 
+\*\*ES\*\* | Sistema automatizado de análisis financiero aplicado a emisores
 
 del mercado de valores dominicano (SIMV).
 
 
 
-\*\*EN\*\* | Automated financial analysis system applied to issuers listed 
+\*\*EN\*\* | Automated financial analysis system applied to issuers listed
 
 on the Dominican securities market (SIMV).
 
@@ -58,7 +58,7 @@ Python · pandas · NumPy · scipy · scikit-learn · Streamlit · ReportLab · 
 
 
 
-🚧 En desarrollo activo | Active development  
+🚧 En desarrollo activo | Active development
 
 Trabajo Final de Maestría en Finanzas de Costos — PUCMM 2026
 
@@ -90,15 +90,15 @@ Trabajo Final de Maestría en Finanzas de Costos — PUCMM 2026
 
 
 
-\*\*Enmanuel Figuereo Encarnación\*\*  
+\*\*Enmanuel Figuereo Encarnación\*\*
 
-Matemático | Mathematician  
+Matemático | Mathematician
 
-Maestría en Finanzas de Costos — PUCMM  
+Maestría en Finanzas de Costos — PUCMM 	
 
-Santiago de los Caballeros, República Dominicana  
+Santiago de los Caballeros, República Dominicana
 
-enmaencar11@gmail.com  
+enmaencar11@gmail.com
 
-\[LinkedIn](https://www.linkedin.com/in/tu-perfil)
+\[LinkedIn](https://www.linkedin.com/in/enmanuel-figuereo-encarnaci%C3%B3n-22899a419/)
 
