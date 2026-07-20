@@ -58,7 +58,7 @@ Python · pandas · NumPy · scipy · scikit-learn · Streamlit · ReportLab · 
 
 
 
-🚧 En desarrollo activo | Active development
+ En desarrollo activo | Active development
 
 Trabajo Final de Maestría en Finanzas de Costos — PUCMM 2026
 
