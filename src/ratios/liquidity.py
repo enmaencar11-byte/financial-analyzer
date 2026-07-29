@@ -1,6 +1,7 @@
 # FinAnalyzer Pro — liquidity.py
-# ES: procesar los cálculos de las razones finacieras
-# EN: Process the calculations of the financial ratios
+# ES: procesar los cálculos de las razones finacieras desde los estados fiancieros
+# EN: Process the calculations of the financial ratios from financial statements
+
 
 import pandas as pd
 
@@ -12,3 +13,10 @@ def prueba_acida(df):                                                   #measure
 
     return (df['activo_corriente_total'] - df['inventarios']) / df['pasivo_corriente_total']
 
+def razon_efectivo(df):                                                 #measures the cash at moment
+
+    return df['efectivo_equivalentes'] / df['pasivo_corriente_total']
+
+def capital_trabajo(df):                                                 #measures the pillow; danger < 0 < save
+    
+    return df['activo_corriente_total'] - df['pasivo_corriente_total']
