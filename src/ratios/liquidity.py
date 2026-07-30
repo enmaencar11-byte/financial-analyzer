@@ -1,5 +1,5 @@
 # FinAnalyzer Pro — liquidity.py
-# ES: procesar los cálculos de las razones finacieras desde los estados fiancieros
+# ES: procesar los cálculos de las razones financieras desde los estados financieros
 # EN: Process the calculations of the financial ratios from financial statements
 
 
