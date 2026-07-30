@@ -20,9 +20,10 @@ def cargar_datos(ruta_csv):                             # Loads and validates th
 
     if columnas_faltantes:
         raise ValueError(
-            f'Al archivo CVS le faltan las siguientes columnas:\n'
+            f'Al archivo CSV le faltan las siguientes columnas:\n'
             f'{columnas_faltantes}\n'
             f'Verifica lo que pusiste en la plantilla de Excel.'
         )
     print(f'Archivo cargado correctamente:{len(df)} filas, {len(df.columns)} columnas')
     return df                                           #
+
