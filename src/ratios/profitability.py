@@ -4,11 +4,6 @@
 
 import pandas as pd
 
-'''
-Calcularemos los ratios
-We will calculate the ratios 
-
-'''
 
 
 def margen_bruto(df):                                                  # What profitable is the product or service?
@@ -20,8 +15,8 @@ def margen_operativo(df):                                               # what e
 def margen_neto(df):                                                 # what is the profit?
     return df['utilidad_neta'] / df['ventas_netas']
 
-def retorno_sobre_activos(df):                                          #how many gain the bussiness for each dollar has?
+def retorno_sobre_activos(df):                                          #ROA
     return df['utilidad_neta'] / df['activo_total']
 
-def retorno_sobre_inversion(df):                                        #how many gain the bussiness for each dollar was invered?
+def retorno_sobre_patrimonio(df):                                        # ROE
     return df['utilidad_neta'] / df['patrimonio_total']
