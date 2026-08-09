@@ -10,7 +10,7 @@ def rotacion_inventarios(df):                                         #How many 
 
 def dias_inventario(df):
     
-    return df['365' * 'inventarios'] / df['costo_ventas']           # How many days does it take to sell everything?
+    return 365 * df['inventarios'] / df['costo_ventas']           # How many days does it take to sell everything?
 
 def rotacion_cuentas_x_cobrar(df):
     
