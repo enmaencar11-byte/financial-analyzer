@@ -18,8 +18,15 @@ Thumbs.db
 desktop.ini
 
 # ─── Datos de emisores (NO subir a GitHub) ──
+# Ignora el contenido, pero conserva la estructura de carpetas
 data/*
 !data/.gitkeep
+!data/raw/
+!data/processed/
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
 
 # ─── Salidas generadas ──────────────────────
 outputs/
