@@ -3,7 +3,7 @@
 # EN: Loads and validates the financial statements CSV file
 
 import pandas as pd                                     #  import pandas — for to read CSV.
-from config import TODAS_LAS_COLUMNAS                   # import the column list dinfine in config.py- for know what column the file has
+from src.config import TODAS_LAS_COLUMNAS                   # import the column list dinfine in config.py- for know what column the file has
 
 def cargar_datos(ruta_csv):                             # Loads and validates the financial statements
     try:                                             

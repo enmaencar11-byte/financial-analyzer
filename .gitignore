@@ -1,0 +1,26 @@
+# ─── Python ─────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+
+# ─── Entornos virtuales ─────────────────────
+venv/
+.venv/
+env/
+
+# ─── Temporales de Excel y Office ───────────
+~$*.xlsx
+~$*.docx
+
+# ─── Editor y sistema operativo ─────────────
+.vscode/
+Thumbs.db
+desktop.ini
+
+# ─── Datos de emisores (NO subir a GitHub) ──
+data/*
+!data/.gitkeep
+
+# ─── Salidas generadas ──────────────────────
+outputs/
+*.log
