@@ -74,9 +74,9 @@ Trabajo Final de Maestría en Finanzas de Costos — PUCMM 2026
 
 \- \*\*Fuente | Source:\*\* Superintendencia del Mercado de Valores (SIMV)
 
-\- \*\*Período | Period:\*\* 2021 – 2024
+\- \*\*Período | Period:\*\* 2022 – 2025
 
-\- \*\*Muestra | Sample:\*\* 3 emisores del mercado dominicano
+\- \*\*Muestra | Sample:\*\* 5 emisores del mercado dominicano
 
 \- \*\*Marco normativo | Framework:\*\* NIIF / IFRS
 

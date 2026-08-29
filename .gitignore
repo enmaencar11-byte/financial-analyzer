@@ -23,10 +23,19 @@ data/*
 !data/.gitkeep
 !data/raw/
 !data/processed/
+!data/fuentes/
 data/raw/*
 data/processed/*
+data/fuentes/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+!data/fuentes/.gitkeep
+!data/fuentes/eeff/
+!data/fuentes/feller/
+data/fuentes/eeff/*
+data/fuentes/feller/*
+!data/fuentes/eeff/.gitkeep
+!data/fuentes/feller/.gitkeep
 
 # ─── Salidas generadas ──────────────────────
 outputs/
