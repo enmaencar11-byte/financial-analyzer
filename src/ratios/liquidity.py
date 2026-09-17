@@ -21,3 +21,24 @@ def razon_efectivo(df):                                                 #measure
 def capital_trabajo(df):                                                 #measures the pillow; danger < 0 < save
     
     return df['activo_corriente_total'] - df['pasivo_corriente_total']
+
+def capital_trabajo_sobre_activos(df):
+    """
+    Capital de trabajo neto / Activo total.
+
+    Es la primera variable del modelo Z'' de Altman. Mide la proporción
+    del activo que se encuentra financiada con recursos de corto plazo
+    netos de obligaciones corrientes.
+    """
+    return division_segura(df['capital_trabajo_neto'], df['activo_total'])
+
+
+def razon_deuda_corto_plazo(df):
+    """
+    Deuda financiera de corto plazo / Deuda financiera total.
+
+    Mide la concentración del vencimiento de la deuda. Un valor alto
+    indica exposición a riesgo de refinanciamiento en el corto plazo.
+    """
+    return division_segura(df['deuda_financiera_corto_plazo'],
+                           df['deuda_financiera_total'])
