@@ -3,19 +3,20 @@
 #EN: How well does the company use its resources to generate sales?
 
 import pandas as pd
+from src.utils import division_segura
 
 def rotacion_inventarios(df):                                         #How many times did you sell all your inventory?
 
-   return df['costo_ventas'] / df['inventarios']
+   return division_segura(df['costo_ventas'], df['inventarios'])
 
 def dias_inventario(df):
     
-    return 365 * df['inventarios'] / df['costo_ventas']           # How many days does it take to sell everything?
+    return 365 * division_segura(df['inventarios'], df['costo_ventas'])          # How many days does it take to sell everything?
 
 def rotacion_cuentas_x_cobrar(df):
     
-    return df['ventas_netas'] / df['cuentas_por_cobrar']            # How quickly does he collect what it is owed?
+    return division_segura(df['ventas_netas'], df['cuentas_por_cobrar'])           # How quickly does he collect what it is owed?
 
 def rotacion_activos(df):
     
-    return df['ventas_netas'] / df['activo_total']                   # How many pesos does it generate for every pesos of assets it owns?
+    return division_segura(df['ventas_netas'], df['activo_total'])                  # How many pesos does it generate for every pesos of assets it owns?
