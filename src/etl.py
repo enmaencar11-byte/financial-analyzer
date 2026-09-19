@@ -52,9 +52,11 @@ FILAS_BALANCE = {
     27: 'capital_social',
     28: 'utilidades_retenidas',
     29: 'otras_reservas',
-    30: 'patrimonio_total',
-    36: 'deuda_financiera_total',
-    37: 'capital_trabajo_neto',
+    30: 'patrimonio_controladora',
+    31: 'participaciones_no_controladoras',
+    32: 'patrimonio_total',
+    38: 'deuda_financiera_total',
+    39: 'capital_trabajo_neto',
 }
 
 FILAS_RESULTADOS = {
@@ -73,13 +75,17 @@ FILAS_RESULTADOS = {
     20: 'utilidad_antes_impuestos',
     22: 'impuesto_renta',
     23: 'utilidad_neta',
-    25: 'ebitda',
-    26: 'tasa_impuesto_efectiva',
-    27: 'nopat',
+    25: 'utilidad_neta_controladora',
+    26: 'utilidad_neta_no_controladoras',
+    29: 'ebitda',
+    30: 'tasa_impuesto_efectiva',
+    31: 'nopat',
 }
 
-FILA_CUADRE = 33          # Balance General: debe ser 0
+FILA_CUADRE = 35          # Balance General: debe ser 0
+FILA_DISTRIBUCION = 27    # Estado de Resultados: debe ser 0
 TOLERANCIA_CUADRE = 1.0   # margen por redondeo en la unidad declarada
+
 
 # Hoja 'Datos Generales'
 FILA_NOMBRE_REAL = 4
@@ -129,6 +135,19 @@ def _verificar_cuadre(hoja_balance, emisor, anios):
             errores.append(f'  {emisor} {anio}: descuadre de {cuadre:,.2f}')
     return errores
 
+def _verificar_distribucion(hoja_resultados, emisor, anios):
+    """
+    Comprueba que la utilidad neta sea igual a la suma de la porción
+    atribuible a la controladora y la atribuible a participaciones no
+    controladoras. En estados individuales la segunda es cero.
+    """
+    errores = []
+    for col, anio in zip(COLUMNAS_ANIOS, anios):
+        dif = _valor(hoja_resultados, FILA_DISTRIBUCION, col)
+        if abs(dif) > TOLERANCIA_CUADRE:
+            errores.append(f'  {emisor} {anio}: la distribución del resultado difiere en {dif:,.2f}')
+    return errores
+
 
 def leer_plantilla(ruta):
     """
@@ -155,6 +174,11 @@ def leer_plantilla(ruta):
     errores = _verificar_cuadre(balance, emisor, anios)
     if errores:
         raise ValueError('Descuadre en el balance:\n' + '\n'.join(errores))
+
+    errores = _verificar_distribucion(resultados, emisor, anios)
+    if errores:
+        raise ValueError('Distribución del resultado inconsistente:\n' + '\n'.join(errores))
+ 
 
     filas = []
     for col, anio in zip(COLUMNAS_ANIOS, anios):

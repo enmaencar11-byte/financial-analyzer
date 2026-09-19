@@ -45,6 +45,8 @@ COLUMNAS_BALANCE = [
     'capital_social',                 # share capital
     'utilidades_retenidas',           # retained earnings
     'otras_reservas',                 # other reserves / OCI
+    'patrimonio_controladora',        # equity attributable to owners of the parent
+    'participaciones_no_controladoras',  # non-controlling interests
     'patrimonio_total',               # total equity
 
     # Partidas derivadas / Derived items
@@ -72,6 +74,8 @@ COLUMNAS_RESULTADOS = [
     'utilidad_antes_impuestos',       # income before taxes (EBT)
     'impuesto_renta',                 # income tax
     'utilidad_neta',                  # net income
+    'utilidad_neta_controladora',     # profit attributable to owners of the parent
+    'utilidad_neta_no_controladoras', # profit attributable to NCI
 
     # Derivadas para WACC / EVA / Derived for WACC / EVA
     'ebitda',                         # EBIT + D&A
