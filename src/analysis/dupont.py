@@ -208,3 +208,136 @@ def mostrar(df, nivel=2, ancho=78):
     print(f'  ANÁLISIS DUPONT — NIVEL {nivel}')
     print('=' * ancho)
     print(pivote.round(4).to_string())
+
+    
+
+# ── Contribución de cada factor a la variación del ROE ───────────
+
+# Factores de cada nivel, en el orden en que aparecen en la identidad.
+FACTORES_NIVEL_2 = ['Margen neto', 'Rotación de activos', 'Apalancamiento']
+FACTORES_NIVEL_3 = ['Carga fiscal', 'Carga financiera', 'Margen operativo',
+                    'Rotación de activos', 'Apalancamiento']
+
+
+def _variacion(inicial, final):
+    """
+    Variación relativa entre dos valores de un mismo factor.
+
+    Devuelve un valor nulo cuando el valor inicial es cero o ausente, y
+    también cuando ambos valores tienen signos distintos: la variación
+    relativa de una magnitud que pasa de negativa a positiva produce un
+    número que no admite interpretación económica y que no debe figurar
+    en una tabla de resultados.
+    """
+    if pd.isna(inicial) or pd.isna(final) or inicial == 0:
+        return np.nan
+    if (inicial > 0) != (final > 0):
+        return np.nan
+    return final / inicial - 1
+
+
+def contribucion_factores(df, nivel=3, anio_inicial=None, anio_final=None):
+    """
+    Mide cuánto aportó cada factor a la variación del ROE entre dos
+    ejercicios, por emisor.
+
+    Se reportan dos medidas complementarias.
+
+    La variación relativa de cada factor indica cuánto creció o se redujo
+    respecto del ejercicio inicial. Como los factores se multiplican, el
+    producto de sus variaciones reproduce la variación del ROE.
+
+    El aporte logarítmico distribuye la variación total del ROE entre los
+    factores, de modo que la suma de los aportes es cien por ciento. Se
+    obtiene del hecho de que el logaritmo de un producto es la suma de los
+    logaritmos de sus términos, por lo que la variación logarítmica del ROE
+    equivale a la suma de las variaciones logarítmicas de cada factor. Esta
+    descomposición es exacta y no deja residuo, a diferencia de la
+    atribución por diferencias simples.
+
+    El aporte logarítmico solo se calcula cuando todos los factores
+    conservan signo positivo en ambos ejercicios y el ROE efectivamente
+    varía. En caso contrario se devuelve un valor nulo, pues la variación
+    relativa de una magnitud que cambia de signo carece de interpretación
+    económica.
+    """
+    if nivel == 2:
+        tabla = dupont_nivel_2(df)
+        factores = FACTORES_NIVEL_2
+    elif nivel == 3:
+        tabla = dupont_nivel_3(df)
+        factores = FACTORES_NIVEL_3
+    else:
+        raise ValueError('El nivel debe ser 2 o 3.')
+
+    if anio_inicial is None:
+        anio_inicial = int(tabla['anio'].min())
+    if anio_final is None:
+        anio_final = int(tabla['anio'].max())
+    if anio_inicial == anio_final:
+        raise ValueError('Los ejercicios inicial y final deben ser distintos.')
+
+    filas = []
+    for empresa in tabla['empresa'].unique():
+        sub = tabla[tabla['empresa'] == empresa]
+        ini = sub[sub['anio'] == anio_inicial]
+        fin = sub[sub['anio'] == anio_final]
+        if ini.empty or fin.empty:
+            continue
+        ini = ini.iloc[0]
+        fin = fin.iloc[0]
+
+        # La descomposición logarítmica exige que todos los factores y el
+        # ROE sean positivos en ambos ejercicios.
+        valores = [ini[f] for f in factores] + [fin[f] for f in factores]
+        valores += [ini['ROE reportado'], fin['ROE reportado']]
+        aplicable = all(pd.notna(v) and v > 0 for v in valores)
+
+        if aplicable:
+            variacion_roe_log = np.log(fin['ROE reportado'] / ini['ROE reportado'])
+            aplicable = abs(variacion_roe_log) > 1e-12
+
+        for f in factores:
+            a, b = ini[f], fin[f]
+            variacion = _variacion(a, b)
+            aporte = (np.log(b / a) / variacion_roe_log * 100) if aplicable else np.nan
+            filas.append({
+                'empresa': empresa,
+                'factor': f,
+                f'valor {anio_inicial}': a,
+                f'valor {anio_final}': b,
+                'variación': variacion,
+                'aporte %': aporte,
+            })
+
+        filas.append({
+            'empresa': empresa,
+            'factor': 'ROE',
+            f'valor {anio_inicial}': ini['ROE reportado'],
+            f'valor {anio_final}': fin['ROE reportado'],
+            'variación': _variacion(ini['ROE reportado'], fin['ROE reportado']),
+            'aporte %': 100.0 if aplicable else np.nan,
+        })
+
+    return pd.DataFrame(filas)
+
+
+def mostrar_contribucion(df, nivel=3, anio_inicial=None, anio_final=None, ancho=78):
+    """Imprime la tabla de contribuciones por emisor, con formato legible."""
+    tabla = contribucion_factores(df, nivel, anio_inicial, anio_final)
+    cols_valor = [c for c in tabla.columns if c.startswith('valor ')]
+
+    for empresa in tabla['empresa'].unique():
+        sub = tabla[tabla['empresa'] == empresa].copy()
+        print()
+        print('=' * ancho)
+        print(f'  CONTRIBUCIÓN DE FACTORES — NIVEL {nivel} — {empresa}')
+        print('=' * ancho)
+        salida = sub[['factor'] + cols_valor + ['variación', 'aporte %']].copy()
+        for c in cols_valor:
+            salida[c] = salida[c].map(lambda v: f'{v:,.4f}' if pd.notna(v) else '—')
+        salida['variación'] = salida['variación'].map(
+            lambda v: f'{v:+.1%}' if pd.notna(v) else '—')
+        salida['aporte %'] = salida['aporte %'].map(
+            lambda v: f'{v:+.1f}' if pd.notna(v) else '—')
+        print(salida.to_string(index=False))
