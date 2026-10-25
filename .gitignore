@@ -21,6 +21,8 @@ desktop.ini
 # Ignora el contenido, pero conserva la estructura de carpetas
 data/*
 !data/.gitkeep
+!data/parametros_mercado.csv
+!data/parametros_sector.csv
 !data/raw/
 !data/processed/
 !data/fuentes/

@@ -16,8 +16,18 @@ IDENTIFICADORES = ['empresa', 'anio']
 
 
 def _partidas(df):
-    """Todas las columnas numéricas, excluyendo los identificadores."""
-    return [c for c in df.columns if c not in IDENTIFICADORES]
+    """
+    Todas las columnas numéricas, excluyendo los identificadores.
+
+    El filtro por tipo es necesario y no redundante. El conjunto de datos
+    puede traer columnas de texto incorporadas en etapas posteriores —el
+    sector económico del emisor, por ejemplo—, y la variación interanual
+    de un texto no está definida. Restringir la selección aquí evita que
+    el análisis dependa de cuáles columnas haya agregado el proceso que
+    lo precede.
+    """
+    numericas = df.select_dtypes(include='number').columns
+    return [c for c in numericas if c not in IDENTIFICADORES]
 
 
 def variacion_interanual(df):
