@@ -72,3 +72,35 @@ def a_porcentaje(serie, decimales=2):
         Serie expresada en puntos porcentuales.
     """
     return (pd.Series(serie) * 100).round(decimales)
+# ── Presentación de tablas ───────────────────────────────────────
+
+# Por encima de este valor, una fila se interpreta como monto y se
+# presenta con separador de miles y sin decimales. Por debajo, como
+# razón o tasa, con decimales.
+UMBRAL_MONTO = 1000.0
+
+
+def formatear_pivote(pivote, decimales=4, miles=True):
+    """
+    Devuelve el pivote con cada fila formateada según su magnitud.
+
+    Las tablas de resultados combinan montos del orden de los millones
+    con razones del orden de la unidad. Cuando ambos comparten columna,
+    pandas adopta notación científica para toda la columna, lo que vuelve
+    la tabla ilegible. El formato se decide aquí por fila, que es donde
+    la magnitud es homogénea: una fila de capital invertido contiene
+    montos y una fila de WACC contiene tasas, nunca ambas cosas.
+
+    Los valores ausentes se presentan como 'n/a', de modo que la tabla
+    distinga la inaplicabilidad del valor nulo.
+    """
+    filas = {}
+    for nombre, fila in pivote.iterrows():
+        valores = pd.to_numeric(fila, errors='coerce')
+        if valores.abs().max() >= UMBRAL_MONTO:
+            patron = '{:,.0f}' if miles else '{:.0f}'
+        else:
+            patron = '{:.' + str(decimales) + 'f}'
+        filas[nombre] = fila.map(
+            lambda v: 'n/a' if pd.isna(v) else patron.format(v))
+    return pd.DataFrame(filas).T.reindex(pivote.index)
