@@ -124,6 +124,51 @@ def _estilo():
     })
 
 
+# Orden canónico de los emisores. Determina qué color, trazo y marcador
+# corresponde a cada uno, con independencia de cuáles se estén mostrando.
+_UNIVERSO = []
+
+
+def fijar_universo(emisores):
+    """
+    Registra el orden canónico de los emisores de la muestra completa.
+
+    El color debe seguir a la entidad y no a su posición en la tabla que
+    se está dibujando. Sin este registro, al filtrar un emisor el
+    siguiente ocuparía el primer puesto y cambiaría de color: el lector
+    que venía siguiendo una línea naranja la vería azul sin que nada en
+    los datos hubiera cambiado.
+
+    Se invoca una vez con la muestra completa, antes de dibujar cualquier
+    subconjunto. Un emisor no registrado recibe el siguiente puesto libre
+    y lo conserva mientras dure la ejecución.
+    """
+    global _UNIVERSO
+    _UNIVERSO = list(dict.fromkeys(emisores))
+    return _UNIVERSO
+
+
+def _puesto(emisor):
+    """Puesto canónico de un emisor, registrándolo si no lo estaba."""
+    if emisor not in _UNIVERSO:
+        _UNIVERSO.append(emisor)
+    return _UNIVERSO.index(emisor)
+
+
+def _estilo_serie(emisor):
+    """
+    Color, trazo y marcador que identifican a un emisor.
+
+    Los tres se devuelven juntos porque los tres son codificación de la
+    misma identidad: el color para la pantalla, el trazo y el marcador
+    para la impresión en escala de grises.
+    """
+    i = _puesto(emisor)
+    return (COLORES[i % len(COLORES)],
+            TRAZOS[i % len(TRAZOS)],
+            MARCADORES[i % len(MARCADORES)])
+
+
 def _emisores(df):
     """Emisores en el orden en que aparecen, sin repetir."""
     return list(dict.fromkeys(df['empresa']))
@@ -155,7 +200,21 @@ def _partir(nombre, ancho=14):
 
 
 def _guardar(figura, nombre, dir_salida):
-    """Escribe la figura y la cierra, para no acumular memoria."""
+    """
+    Escribe la figura y la cierra, para no acumular memoria.
+
+    Cuando no se indica carpeta de salida, devuelve la figura sin
+    escribirla ni cerrarla. Esa variante es la que emplea el panel
+    interactivo, que necesita el objeto en memoria y no un archivo.
+
+    De este modo las ocho funciones de figura sirven a los dos destinos
+    sin duplicarse: el reporte las escribe y el panel las muestra. Un
+    panel con su propio código de dibujo acabaría divergiendo del
+    reporte, y entonces no habría manera de saber cuál de los dos
+    representa el resultado.
+    """
+    if dir_salida is None:
+        return figura
     dir_salida = Path(dir_salida)
     dir_salida.mkdir(parents=True, exist_ok=True)
     ruta = dir_salida / f'{nombre}.{FORMATO}'
@@ -235,11 +294,12 @@ def altman(df, dir_salida=DIR_FIGURAS):
         eje.axhline(umbral, color=TINTA_SUAVE, linewidth=0.8,
                     linestyle='--', zorder=1)
 
-    for i, emisor in enumerate(_emisores(df)):
+    for emisor in _emisores(df):
         sub = tabla[tabla['empresa'] == emisor].sort_values('anio')
-        eje.plot(sub['anio'], sub["Z''"], color=COLORES[i % len(COLORES)],
-                 linestyle=TRAZOS[i % len(TRAZOS)], marker=MARCADORES[i % len(MARCADORES)],
-                 markersize=5, linewidth=2, label=emisor, zorder=3)
+        color, trazo, marcador = _estilo_serie(emisor)
+        eje.plot(sub['anio'], sub["Z''"], color=color, linestyle=trazo,
+                 marker=marcador, markersize=5, linewidth=2, label=emisor,
+                 zorder=3)
 
     eje.set_xticks(anios)
     eje.set_xlabel('Ejercicio')
@@ -458,23 +518,23 @@ def dupont_factores(df, dir_salida=DIR_FIGURAS, nivel=3):
                             columnas=min(3, len(factores) + 1))
 
     for eje, factor in zip(ejes, factores + ['ROE reportado']):
-        for i, emisor in enumerate(emisores):
+        for emisor in emisores:
             sub = tabla[tabla['empresa'] == emisor].sort_values('anio')
-            eje.plot(sub['anio'], sub[factor], color=COLORES[i % len(COLORES)],
-                     linestyle=TRAZOS[i % len(TRAZOS)],
-                     marker=MARCADORES[i % len(MARCADORES)],
-                     markersize=4, linewidth=1.6, label=emisor)
+            color, trazo, marcador = _estilo_serie(emisor)
+            eje.plot(sub['anio'], sub[factor], color=color, linestyle=trazo,
+                     marker=marcador, markersize=4, linewidth=1.6,
+                     label=emisor)
         eje.set_title(factor, fontsize=8.5)
         eje.set_xticks(anios)
         eje.tick_params(labelsize=7)
 
     ejes[-1].set_title('ROE (producto de los factores)', fontsize=8.5)
 
-    manejos = [Line2D([], [], color=COLORES[i % len(COLORES)],
-                      linestyle=TRAZOS[i % len(TRAZOS)],
-                      marker=MARCADORES[i % len(MARCADORES)],
+    manejos = [Line2D([], [], color=_estilo_serie(e)[0],
+                      linestyle=_estilo_serie(e)[1],
+                      marker=_estilo_serie(e)[2],
                       markersize=4, linewidth=1.6, label=e)
-               for i, e in enumerate(emisores)]
+               for e in emisores]
     figura.legend(handles=manejos, loc='lower center',
                   ncols=min(3, len(emisores)), fontsize=7.5,
                   bbox_to_anchor=(0.5, -0.11))
@@ -633,14 +693,13 @@ def sensibilidad_eva(df, dir_salida=DIR_FIGURAS, valores=None):
 
     umbrales_hallados = []
 
-    for i, emisor in enumerate(emisores):
+    for emisor in emisores:
         sub = tabla[tabla['empresa'] == emisor].sort_values('wacc')
+        color, trazo, marcador = _estilo_serie(emisor)
         # Un marcador cada cuatro puntos: con veintiún valores por serie,
         # marcarlos todos convierte la línea en una hilera de símbolos.
-        eje.plot(sub['wacc'], sub['EVA promedio'],
-                 color=COLORES[i % len(COLORES)],
-                 linestyle=TRAZOS[i % len(TRAZOS)],
-                 marker=MARCADORES[i % len(MARCADORES)], markevery=4,
+        eje.plot(sub['wacc'], sub['EVA promedio'], color=color,
+                 linestyle=trazo, marker=marcador, markevery=4,
                  markersize=4.5, linewidth=1.8, label=emisor, zorder=3)
 
         # Umbral por interpolación lineal entre los dos valores que
@@ -651,10 +710,10 @@ def sensibilidad_eva(df, dir_salida=DIR_FIGURAS, valores=None):
         if len(cruces):
             k = cruces[0]
             umbral = x[k] + (0 - y[k]) * (x[k + 1] - x[k]) / (y[k + 1] - y[k])
-            umbrales_hallados.append((umbral, i))
+            umbrales_hallados.append((umbral, emisor))
             eje.plot([umbral], [0], marker='o', markersize=7,
                      markerfacecolor='white', markeredgewidth=1.6,
-                     markeredgecolor=COLORES[i % len(COLORES)], zorder=4)
+                     markeredgecolor=color, zorder=4)
 
     # Las etiquetas de umbral se colocan en una segunda pasada, escalonadas
     # en altura cuando dos emisores cruzan el eje a distancia menor que la
@@ -662,7 +721,7 @@ def sensibilidad_eva(df, dir_salida=DIR_FIGURAS, valores=None):
     # el umbral es justamente la cifra que la figura existe para mostrar.
     separacion = (eje.get_xlim()[1] - eje.get_xlim()[0]) * 0.055
     nivel, anterior = 0, None
-    for umbral, i in sorted(umbrales_hallados):
+    for umbral, emisor in sorted(umbrales_hallados, key=lambda par: par[0]):
         if anterior is not None and umbral - anterior < separacion:
             nivel += 1
         else:
@@ -670,7 +729,7 @@ def sensibilidad_eva(df, dir_salida=DIR_FIGURAS, valores=None):
         eje.annotate(f'{umbral:.2%}', xy=(umbral, 0),
                      xytext=(0, -14 - 11 * nivel),
                      textcoords='offset points', ha='center', fontsize=7,
-                     color=COLORES[i % len(COLORES)], fontweight='bold')
+                     color=_estilo_serie(emisor)[0], fontweight='bold')
         anterior = umbral
 
     eje.axhline(0, color=TINTA, linewidth=1.1, zorder=2)
