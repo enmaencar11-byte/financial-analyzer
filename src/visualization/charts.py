@@ -56,6 +56,7 @@ from src.analysis import dupont as mod_dupont
 from src.analysis import eva as mod_eva
 from src.analysis import vertical as mod_vertical
 from src.analysis import wacc as mod_wacc
+from src import ratios as mod_ratios
 
 RAIZ = Path(__file__).resolve().parent.parent.parent
 DIR_FIGURAS = RAIZ / 'outputs' / 'figuras'
@@ -375,13 +376,17 @@ def roic_wacc(df, dir_salida=DIR_FIGURAS, **sustitutos):
                       marker='s', markersize=4, label='WACC'),
                Patch(facecolor=VERDE, alpha=0.22, label='Crea valor'),
                Patch(facecolor=ROJO, alpha=0.22, label='Destruye valor')]
-    figura.legend(handles=manejos, loc='lower center', ncols=4, fontsize=7.5,
-                  bbox_to_anchor=(0.5, -0.05))
     figura.suptitle('Retorno sobre el capital invertido frente a su costo',
                     fontsize=10, fontweight='bold', y=1.0)
     figura.supxlabel('Ejercicio', fontsize=9)
     figura.supylabel('Tasa anual', fontsize=9)
     figura.tight_layout()
+
+    # La leyenda se coloca DESPUÉS de tight_layout y por debajo del
+    # rótulo del eje. Situada antes, tight_layout no reserva espacio para
+    # ella y el rótulo del eje queda impreso encima.
+    figura.legend(handles=manejos, loc='lower center', ncols=4, fontsize=7.5,
+                  bbox_to_anchor=(0.5, -0.09))
     return _guardar(figura, '02_roic_vs_wacc', dir_salida)
 
 
@@ -403,6 +408,7 @@ def eva(df, dir_salida=DIR_FIGURAS, **sustitutos):
 
     ancho_barra = 0.8 / len(anios)
     posiciones = np.arange(len(emisores))
+    marcas_anio, etiquetas_anio = [], []
 
     for j, anio in enumerate(anios):
         valores = [
@@ -411,28 +417,39 @@ def eva(df, dir_salida=DIR_FIGURAS, **sustitutos):
             for e in emisores]
         x = posiciones - 0.4 + ancho_barra * (j + 0.5)
         colores = [VERDE if v >= 0 else ROJO for v in valores]
-        # Sin trama: el ejercicio va rotulado sobre cada barra, de modo
+        # Sin trama: el ejercicio va rotulado bajo cada barra, de modo
         # que la identidad no depende del color y una trama adicional
         # solo agregaría ruido visual.
         eje.bar(x, valores, width=ancho_barra * 0.88, color=colores,
                 alpha=0.9, edgecolor='white', linewidth=0.8, zorder=2)
-        for xi, v in zip(x, valores):
-            eje.annotate(str(anio), xy=(xi, 0), xytext=(0, -3 if v >= 0 else 3),
-                         textcoords='offset points', ha='center',
-                         va='top' if v >= 0 else 'bottom',
-                         fontsize=6, color=TINTA_SUAVE, rotation=90)
+        marcas_anio.extend(x)
+        etiquetas_anio.extend([str(anio)] * len(x))
 
     eje.axhline(0, color=TINTA, linewidth=1.1, zorder=3)
+
+    # Los ejercicios van como marcas secundarias del eje y no como
+    # rótulos flotantes sobre la línea de cero. Un rótulo situado en cero
+    # queda en la parte alta del gráfico cuando la mayoría de los valores
+    # es negativa, que es justo donde la leyenda necesita espacio.
+    eje.set_xticks(marcas_anio, minor=True)
+    eje.set_xticklabels(etiquetas_anio, minor=True, fontsize=6,
+                        color=TINTA_SUAVE)
     eje.set_xticks(posiciones)
     eje.set_xticklabels([_partir(e) for e in emisores], fontsize=8)
+    eje.tick_params(axis='x', which='major', length=0, pad=16)
+    eje.tick_params(axis='x', which='minor', length=2)
+
     eje.set_ylabel('EVA (unidades monetarias)')
     eje.set_title('Valor económico agregado por emisor y ejercicio')
     eje.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f'{v:,.0f}'))
-    eje.grid(axis='x', visible=False)
+    eje.grid(axis='x', visible=False, which='both')
 
-    eje.legend(handles=[Patch(facecolor=VERDE, alpha=0.85, label='Crea valor'),
-                        Patch(facecolor=ROJO, alpha=0.85, label='Destruye valor')],
-               loc='upper left', ncols=2)
+    # La leyenda va al pie: dentro del área de trazado se superpondría a
+    # las barras, cuya orientación depende del signo y no puede preverse.
+    figura.legend(handles=[Patch(facecolor=VERDE, alpha=0.9, label='Crea valor'),
+                           Patch(facecolor=ROJO, alpha=0.9, label='Destruye valor')],
+                  loc='lower center', ncols=2, fontsize=8,
+                  bbox_to_anchor=(0.5, -0.04))
     figura.tight_layout()
     return _guardar(figura, '03_eva', dir_salida)
 
@@ -489,7 +506,116 @@ def composicion_wacc(df, dir_salida=DIR_FIGURAS, **sustitutos):
     return _guardar(figura, '04_composicion_wacc', dir_salida)
 
 
+# ── 3b. Catálogo de indicadores ──────────────────────────────────
+
+def indicadores(df, categoria, dir_salida=DIR_FIGURAS):
+    """
+    Evolución de los indicadores de una categoría, un panel por indicador.
+
+    Las cuatro categorías se representan por separado y no en una sola
+    figura. Treinta y tres paneles en una página no se leen, y la
+    categoría es además la unidad con que el análisis financiero los
+    interpreta: la liquidez y la rentabilidad responden preguntas
+    distintas y se comentan en apartados distintos.
+
+    Cada panel lleva su propia escala vertical, porque los indicadores de
+    una misma categoría difieren en orden de magnitud: una razón
+    corriente se mueve alrededor de la unidad y un capital de trabajo
+    neto en millones. Compartir escala aplastaría los primeros contra el
+    eje.
+
+    Los indicadores que no varían en el período se presentan como una
+    línea plana y no como una ampliación del error de representación en
+    punto flotante, conforme al criterio de _escala_factor.
+    """
+    if categoria not in mod_ratios.CATEGORIAS:
+        raise ValueError(f'Categoría desconocida: {categoria}. '
+                         f'Opciones: {", ".join(mod_ratios.CATEGORIAS)}')
+
+    tabla = mod_ratios.calcular_todos(df, categoria=categoria)
+    nombres = [c for c in tabla.columns if c not in IDENTIFICADORES]
+    emisores = _emisores(df)
+    anios = _anios(df)
+
+    _estilo()
+    figura, ejes = _paneles(len(nombres), alto_panel=1.9,
+                            columnas=min(3, len(nombres)))
+
+    for eje, nombre in zip(ejes, nombres):
+        for emisor in emisores:
+            sub = tabla[tabla['empresa'] == emisor].sort_values('anio')
+            color, trazo, marcador = _estilo_serie(emisor)
+            eje.plot(sub['anio'], sub[nombre], color=color, linestyle=trazo,
+                     marker=marcador, markersize=4, linewidth=1.6,
+                     label=emisor)
+
+        _escala_factor(eje, tabla[nombre])
+        eje.set_title(nombre, fontsize=8)
+        eje.set_xticks(anios)
+        eje.tick_params(labelsize=7)
+
+    manejos = [Line2D([], [], color=_estilo_serie(e)[0],
+                      linestyle=_estilo_serie(e)[1],
+                      marker=_estilo_serie(e)[2],
+                      markersize=4, linewidth=1.6, label=e)
+               for e in emisores]
+    figura.legend(handles=manejos, loc='lower center',
+                  ncols=min(3, len(emisores)), fontsize=7.5,
+                  bbox_to_anchor=(0.5, -0.09))
+    figura.suptitle(f'Indicadores de {categoria.lower()} — evolución '
+                    f'{anios[0]}–{anios[-1]}',
+                    fontsize=10, fontweight='bold', y=1.0)
+    figura.tight_layout()
+
+    seguro = categoria.lower().replace(' ', '_')
+    return _guardar(figura, f'09_indicadores_{seguro}', dir_salida)
+
+
 # ── 4. Descomposición del rendimiento ────────────────────────────
+
+# Por debajo de esta proporción respecto de su propia magnitud, la
+# variación de un factor se considera nula y no una tendencia.
+TOLERANCIA_CONSTANTE = 1e-3
+
+
+def _escala_factor(eje, valores):
+    """
+    Fija la escala vertical de un factor y suprime la notación de
+    desplazamiento del eje.
+
+    Dos correcciones, ambas de fondo y no de apariencia.
+
+    La primera. Matplotlib ajusta el eje al intervalo de los datos. Si un
+    factor permanece constante a lo largo del período, ese intervalo se
+    reduce al error de representación en punto flotante, del orden de
+    1e-17, y la figura presenta como tendencia lo que es ruido
+    aritmético. Un lector concluiría que el factor subió y bajó cuando no
+    se movió. Cuando la variación resulta despreciable frente a la propia
+    magnitud del factor, se impone una banda alrededor de su valor, con
+    lo que la línea se lee plana, que es lo que efectivamente ocurrió.
+
+    La segunda. Para intervalos estrechos, Matplotlib rotula el eje con
+    un desplazamiento del tipo '1e-8+1.1e-1' que se sitúa sobre el título
+    del panel. Suprimirlo obliga a rotular los valores completos, que es
+    además lo que corresponde en un documento impreso.
+    """
+    numeros = pd.to_numeric(valores, errors='coerce').dropna()
+    if numeros.empty:
+        return
+
+    minimo, maximo = float(numeros.min()), float(numeros.max())
+    centro = (minimo + maximo) / 2
+    escala = max(abs(centro), 1e-12)
+
+    if (maximo - minimo) < escala * TOLERANCIA_CONSTANTE:
+        margen = max(abs(centro) * 0.08, 1e-6)
+        eje.set_ylim(centro - margen, centro + margen)
+
+    try:
+        eje.ticklabel_format(axis='y', style='plain', useOffset=False)
+    except AttributeError:
+        pass
+
 
 def dupont_factores(df, dir_salida=DIR_FIGURAS, nivel=3):
     """
@@ -524,6 +650,8 @@ def dupont_factores(df, dir_salida=DIR_FIGURAS, nivel=3):
             eje.plot(sub['anio'], sub[factor], color=color, linestyle=trazo,
                      marker=marcador, markersize=4, linewidth=1.6,
                      label=emisor)
+
+        _escala_factor(eje, tabla[factor])
         eje.set_title(factor, fontsize=8.5)
         eje.set_xticks(anios)
         eje.tick_params(labelsize=7)
@@ -836,6 +964,12 @@ def generar_todos(df, dir_salida=DIR_FIGURAS, por_emisor=True, **sustitutos):
         ('Sensibilidad del EVA', lambda: sensibilidad_eva(df, dir_salida)),
         ('Composición del activo', lambda: vertical_activo(df, dir_salida)),
     ]
+
+    # Una figura por categoría de indicador. El catálogo es la fuente:
+    # añadir un indicador a src/ratios lo incorpora aquí sin tocar nada.
+    for categoria in mod_ratios.CATEGORIAS:
+        tareas.append((f'Indicadores de {categoria.lower()}',
+                       lambda c=categoria: indicadores(df, c, dir_salida)))
 
     if por_emisor:
         for emisor in _emisores(df):

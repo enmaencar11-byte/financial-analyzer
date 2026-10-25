@@ -53,6 +53,7 @@ from src.analysis import capm as mod_capm
 from src.analysis import dupont as mod_dupont
 from src.analysis import eva as mod_eva
 from src.analysis import wacc as mod_wacc
+from src import ratios as mod_ratios
 from src.data_loader import cargar_datos
 from src.utils import UMBRAL_MONTO
 from src.parametros import incorporar
@@ -130,6 +131,13 @@ def seleccionar(df):
     Un emisor solo es una selección legítima: muchas de las figuras se
     leen mejor de uno en uno, y el análisis por emisor es el uso habitual
     cuando se redacta el apartado correspondiente a cada uno.
+
+    La función no interrumpe la ejecución cuando la selección queda
+    vacía. Devuelve el conjunto vacío y deja que quien la invoca decida:
+    así los controles de parámetros alcanzan a dibujarse y el usuario
+    conserva una barra lateral completa desde la que corregir. Detener el
+    proceso aquí dejaba la página reducida al propio selector, lo que
+    parecía una falla del programa en lugar de una selección vacía.
     """
     completos = list(dict.fromkeys(df['empresa']))
     charts.fijar_universo(completos)
@@ -151,26 +159,16 @@ def seleccionar(df):
     else:
         desde = hasta = anios[0]
 
-    if not elegidos:
-        st.sidebar.error('Seleccione al menos un emisor.')
-        st.warning('No hay ningún emisor seleccionado. Elija al menos uno '
-                   'en la barra lateral.')
-        st.stop()
-
     filtrado = df[df['empresa'].isin(elegidos)
                   & df['anio'].between(desde, hasta)].reset_index(drop=True)
 
     if filtrado.empty:
         st.sidebar.error('La selección no deja observaciones.')
-        st.warning('La combinación de emisores y ejercicios elegida no deja '
-                   'ninguna observación.')
-        st.stop()
-
-    total = len(completos)
-    if len(elegidos) < total or (desde, hasta) != (anios[0], anios[-1]):
-        st.sidebar.info(
-            f'{len(elegidos)} de {total} emisores · '
-            f'ejercicios {desde}–{hasta}')
+    else:
+        total = len(completos)
+        if len(elegidos) < total or (desde, hasta) != (anios[0], anios[-1]):
+            st.sidebar.info(f'{len(elegidos)} de {total} emisores · '
+                            f'ejercicios {desde}–{hasta}')
 
     st.sidebar.divider()
     return filtrado
@@ -303,7 +301,11 @@ def _figura(constructor):
     más en memoria.
     """
     figura = constructor()
-    st.pyplot(figura, use_container_width=True)
+    # Sin use_container_width: el parametro quedo obsoleto y su sucesor,
+    # width='stretch', es ya el valor por defecto. Omitirlo produce el
+    # mismo resultado en las versiones actuales y no rompe en las
+    # anteriores, donde width no existe.
+    st.pyplot(figura)
     plt.close(figura)
 
 
@@ -334,6 +336,51 @@ def _formato(tabla, porcentajes):
     return tabla.style.format(estilo, na_rep='n/a')
 
 
+def pestana_indicadores(df):
+    """
+    El catálogo de razones financieras, por categoría.
+
+    Las cuatro categorías se presentan por separado y no juntas. La
+    categoría es la unidad con que el análisis financiero interpreta los
+    indicadores: la liquidez responde si la empresa puede pagar lo que
+    vence pronto y la rentabilidad si gana dinero, preguntas que se
+    comentan en apartados distintos y que treinta y tres paneles en una
+    sola vista no ayudarían a separar.
+    """
+    conteo = mod_ratios.resumen()
+
+    st.subheader('Razones financieras')
+    st.markdown(
+        f'El sistema calcula **{conteo["TOTAL"]} indicadores** agrupados en '
+        f'cuatro categorías. Ninguno responde por sí solo si la empresa va '
+        f'bien: el margen neto no sabe si puede pagar la nómina del mes, y '
+        f'la razón corriente no sabe si el negocio es rentable. Se leen en '
+        f'conjunto.')
+
+    columnas = st.columns(len(mod_ratios.CATEGORIAS))
+    for columna, categoria in zip(columnas, mod_ratios.CATEGORIAS):
+        columna.metric(categoria, conteo.get(categoria, 0))
+
+    st.divider()
+
+    categoria = st.radio(
+        'Categoría', mod_ratios.CATEGORIAS, horizontal=True,
+        help='Cada categoría responde una pregunta distinta sobre la '
+             'misma empresa.')
+
+    _figura(lambda: charts.indicadores(df, categoria, dir_salida=None))
+
+    tabla = mod_ratios.calcular_todos(df, categoria=categoria)
+    st.dataframe(_formato(tabla, []), hide_index=True)
+
+    st.caption(
+        'Un valor ausente indica que el indicador no aplica al emisor y '
+        'ejercicio correspondientes, no que valga cero. Un ROE calculado '
+        'sobre patrimonio negativo, por ejemplo, resultaría positivo por '
+        'cancelación de signos y carecería de significado económico, de '
+        'modo que se excluye.')
+
+
 def pestana_valor(df, tabla_eva, sustitutos, wacc_valor):
     """Creación o destrucción de valor."""
     st.subheader('Creación y destrucción de valor')
@@ -354,7 +401,7 @@ def pestana_valor(df, tabla_eva, sustitutos, wacc_valor):
 
     st.dataframe(_formato(tabla_eva, ['ROIC', 'WACC',
                                           'Diferencial ROIC − WACC']),
-                 use_container_width=True, hide_index=True)
+                 hide_index=True)
 
 
 def pestana_sensibilidad(df):
@@ -394,7 +441,7 @@ def pestana_costo(df, sustitutos):
                 df, **{k: v for k, v in sustitutos.items() if k != 'kd'}),
                 ['Rf', 'ERP', 'CRP', 'Tasa impuesto', 'Ke',
                  'Prima por riesgo sistemático']),
-            use_container_width=True, hide_index=True)
+            hide_index=True)
     with derecha:
         st.markdown('**Costo promedio ponderado**')
         st.dataframe(
@@ -402,7 +449,7 @@ def pestana_costo(df, sustitutos):
                          ['Peso patrimonio', 'Peso deuda', 'Ke', 'Kd',
                           'Kd después de impuestos', 'WACC',
                           'Aporte del patrimonio', 'Aporte de la deuda']),
-            use_container_width=True, hide_index=True)
+            hide_index=True)
 
 
 def pestana_riesgo(df):
@@ -417,7 +464,7 @@ def pestana_riesgo(df):
     _figura(lambda: charts.altman(df, dir_salida=None))
 
     tabla = mod_altman.calcular(df)
-    st.dataframe(tabla, use_container_width=True, hide_index=True)
+    st.dataframe(tabla, hide_index=True)
 
     conteo = mod_altman.resumen_zonas(df)
     c1, c2, c3 = st.columns(3)
@@ -454,7 +501,7 @@ def pestana_rendimiento(df):
 
     st.dataframe(mod_dupont.dupont_nivel_3(df) if nivel == 3
                  else mod_dupont.dupont_nivel_2(df),
-                 use_container_width=True, hide_index=True)
+                 hide_index=True)
 
 
 def pestana_validacion(df, sustitutos, wacc_valor):
@@ -492,7 +539,7 @@ def pestana_validacion(df, sustitutos, wacc_valor):
         for s, o in zip(tabla['Satisfacen'], tabla['Observaciones'])]
 
     st.dataframe(tabla.style.format({'Discrepancia máxima': '{:.2e}'}),
-                 use_container_width=True, hide_index=True)
+                 hide_index=True)
 
     if (tabla['Resultado'] == 'Satisface').all():
         st.success('Todas las comprobaciones de consistencia interna se '
@@ -530,15 +577,32 @@ def main():
         st.error(str(error))
         st.stop()
 
-    df = seleccionar(df)
-    sustitutos, wacc_valor = barra_lateral(df)
+    seleccion = seleccionar(df)
+
+    # Los controles de parámetros se dibujan siempre, aun con la
+    # selección vacía: una barra lateral incompleta se lee como una
+    # falla. Cuando no hay observaciones se toman del conjunto completo,
+    # que solo determina el valor inicial de cada control.
+    sustitutos, wacc_valor = barra_lateral(
+        seleccion if not seleccion.empty else df)
+
+    if seleccion.empty:
+        st.info('No hay ningún emisor seleccionado.\n\n'
+                'Elija al menos uno en la barra lateral para ver el '
+                'análisis. Los parámetros del modelo quedan como estaban.')
+        st.stop()
+
+    df = seleccion
     tabla_eva = encabezado(df, sustitutos, wacc_valor)
     st.divider()
 
-    valor, sensibilidad, costo, riesgo, rendimiento, validacion = st.tabs(
-        ['Valor', 'Sensibilidad', 'Costo de capital', 'Riesgo',
-         'Rendimiento', 'Validación'])
+    (indicadores, valor, sensibilidad, costo, riesgo, rendimiento,
+     validacion) = st.tabs(
+        ['Indicadores', 'Valor', 'Sensibilidad', 'Costo de capital',
+         'Riesgo', 'Rendimiento', 'Validación'])
 
+    with indicadores:
+        pestana_indicadores(df)
     with valor:
         pestana_valor(df, tabla_eva, sustitutos, wacc_valor)
     with sensibilidad:
@@ -553,4 +617,10 @@ def main():
         pestana_validacion(df, sustitutos, wacc_valor)
 
 
-main()
+# Streamlit ejecuta el archivo indicado en la instrucción con __name__
+# igual a '__main__', de modo que esta guarda permite abrir el panel de
+# dos maneras: directamente sobre este archivo, o desde app.py, que
+# importa main y lo invoca. Sin la guarda, la importación desde app.py
+# armaría la página una segunda vez.
+if __name__ == '__main__':
+    main()
