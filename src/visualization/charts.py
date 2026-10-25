@@ -54,6 +54,7 @@ from matplotlib.patches import Patch
 from src.analysis import altman as mod_altman
 from src.analysis import dupont as mod_dupont
 from src.analysis import eva as mod_eva
+from src.analysis import horizontal as mod_horizontal
 from src.analysis import vertical as mod_vertical
 from src.analysis import wacc as mod_wacc
 from src import ratios as mod_ratios
@@ -939,6 +940,138 @@ def vertical_activo(df, dir_salida=DIR_FIGURAS, partidas=None):
     return _guardar(figura, '08_vertical_activo', dir_salida)
 
 
+def vertical_resultados(df, dir_salida=DIR_FIGURAS):
+    """
+    Estructura del estado de resultados, como porcentaje de las ventas.
+
+    Los segmentos se apilan porque son partes de un todo: el costo de
+    ventas, los gastos operativos, el costo financiero, el impuesto y la
+    utilidad neta agotan la venta de cada ejercicio. Es lo que el
+    análisis vertical establece al tomar las ventas como base.
+
+    La figura responde una pregunta que los indicadores de rentabilidad
+    no responden. El margen neto dice cuánto queda de cada peso vendido;
+    esta dice adónde se fue el resto, que es lo que permite actuar: un
+    margen que cae porque subió el costo de ventas exige una respuesta
+    distinta de uno que cae porque subió el gasto financiero.
+    """
+    _estilo()
+    tabla = mod_vertical.vertical_resultados(df)
+
+    # Cada tramo se obtiene por diferencia respecto del anterior, de modo
+    # que la suma reproduzca el cien por ciento de las ventas sin
+    # solapamientos. La utilidad bruta, por ejemplo, ya contiene a la
+    # operativa, y apilarlas juntas contaría dos veces lo mismo.
+    tramos = [
+        ('Costo de ventas', lambda r: r['costo_ventas']),
+        ('Gastos operativos', lambda r: r['total_gastos_operativos']),
+        ('Costo financiero neto',
+         lambda r: r['utilidad_operativa'] - r['utilidad_antes_impuestos']),
+        ('Impuesto sobre la renta', lambda r: r['impuesto_renta']),
+        ('Utilidad neta', lambda r: r['utilidad_neta']),
+    ]
+
+    emisores = _emisores(df)
+    figura, ejes = _paneles(len(emisores), alto_panel=2.1)
+
+    for eje, emisor in zip(ejes, emisores):
+        sub = tabla[tabla['empresa'] == emisor].sort_values('anio')
+        x = np.arange(len(sub))
+        acumulado = np.zeros(len(sub))
+
+        for k, (etiqueta, formula) in enumerate(tramos):
+            valores = formula(sub).to_numpy(dtype=float)
+            eje.bar(x, valores, width=0.62, bottom=acumulado,
+                    color=COLORES[k % len(COLORES)], alpha=0.9,
+                    edgecolor='white', linewidth=1.2,
+                    hatch=TRAMAS[k % len(TRAMAS)], label=etiqueta)
+            acumulado += valores
+
+        # La utilidad neta se rotula por ser la cifra que el lector busca.
+        for xi, valor in zip(x, tramos[-1][1](sub).to_numpy(dtype=float)):
+            eje.annotate(f'{valor:.1f}%', xy=(xi, acumulado[int(xi)]),
+                         xytext=(0, 3), textcoords='offset points',
+                         ha='center', fontsize=7, color=TINTA)
+
+        eje.set_title(emisor, fontsize=9)
+        eje.set_xticks(x)
+        eje.set_xticklabels([str(a) for a in sub['anio']], fontsize=7)
+        eje.set_ylim(0, max(float(acumulado.max()) * 1.12, 100))
+        eje.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f'{v:.0f}%'))
+        eje.grid(axis='x', visible=False)
+
+    manejos, etiquetas = ejes[0].get_legend_handles_labels()
+    figura.legend(manejos, etiquetas, loc='lower center', ncols=3,
+                  fontsize=7.5, bbox_to_anchor=(0.5, -0.14))
+    figura.suptitle('Estructura del estado de resultados — análisis vertical',
+                    fontsize=10, fontweight='bold', y=1.0)
+    figura.tight_layout()
+    return _guardar(figura, '10_vertical_resultados', dir_salida)
+
+
+def horizontal_indices(df, dir_salida=DIR_FIGURAS, partidas=None,
+                       anio_base=None):
+    """
+    Evolución de las magnitudes principales, con el primer ejercicio
+    igual a cien.
+
+    Los números índice permiten comparar en una misma escala partidas de
+    magnitudes muy distintas: las ventas y el patrimonio de un emisor
+    difieren en orden de magnitud, pero sus índices se leen juntos y
+    revelan cuál creció más deprisa.
+
+    Esa comparación es el objeto del análisis horizontal. Que las ventas
+    crezcan veinte por ciento no dice nada por sí solo; que crezcan
+    veinte mientras la deuda financiera crece sesenta dice bastante.
+    """
+    _estilo()
+    tabla = mod_horizontal.numeros_indice(df[
+        [c for c in df.columns
+         if c in IDENTIFICADORES or pd.api.types.is_numeric_dtype(df[c])]],
+        anio_base=anio_base)
+
+    partidas = partidas or ['ventas_netas', 'utilidad_operativa',
+                            'utilidad_neta', 'activo_total',
+                            'patrimonio_total', 'deuda_financiera_total']
+    partidas = [p for p in partidas if p in tabla.columns]
+
+    nombres = {'ventas_netas': 'Ventas netas',
+               'utilidad_operativa': 'Utilidad operativa',
+               'utilidad_neta': 'Utilidad neta',
+               'activo_total': 'Activo total',
+               'patrimonio_total': 'Patrimonio',
+               'deuda_financiera_total': 'Deuda financiera',
+               'ebitda': 'EBITDA'}
+
+    emisores = _emisores(df)
+    anios = _anios(df)
+    figura, ejes = _paneles(len(emisores), alto_panel=2.3)
+
+    for eje, emisor in zip(ejes, emisores):
+        sub = tabla[tabla['empresa'] == emisor].sort_values('anio')
+        for k, partida in enumerate(partidas):
+            eje.plot(sub['anio'], sub[partida], color=COLORES[k % len(COLORES)],
+                     linestyle=TRAZOS[k % len(TRAZOS)],
+                     marker=MARCADORES[k % len(MARCADORES)], markersize=4,
+                     linewidth=1.6, label=nombres.get(partida, partida))
+
+        # La referencia: por encima de cien la partida creció.
+        eje.axhline(100, color=TINTA_SUAVE, linewidth=0.9, linestyle='--',
+                    zorder=1)
+        eje.set_title(emisor, fontsize=9)
+        eje.set_xticks(anios)
+        eje.tick_params(labelsize=7)
+
+    manejos, etiquetas = ejes[0].get_legend_handles_labels()
+    figura.legend(manejos, etiquetas, loc='lower center', ncols=3,
+                  fontsize=7.5, bbox_to_anchor=(0.5, -0.16))
+    base = anio_base or anios[0]
+    figura.suptitle(f'Evolución de las magnitudes principales — '
+                    f'{base} = 100', fontsize=10, fontweight='bold', y=1.0)
+    figura.tight_layout()
+    return _guardar(figura, '11_horizontal_indices', dir_salida)
+
+
 # ── Generación completa ──────────────────────────────────────────
 
 def generar_todos(df, dir_salida=DIR_FIGURAS, por_emisor=True, **sustitutos):
@@ -963,6 +1096,9 @@ def generar_todos(df, dir_salida=DIR_FIGURAS, por_emisor=True, **sustitutos):
         ('DuPont nivel 3', lambda: dupont_factores(df, dir_salida, nivel=3)),
         ('Sensibilidad del EVA', lambda: sensibilidad_eva(df, dir_salida)),
         ('Composición del activo', lambda: vertical_activo(df, dir_salida)),
+        ('Estructura de resultados',
+         lambda: vertical_resultados(df, dir_salida)),
+        ('Números índice', lambda: horizontal_indices(df, dir_salida)),
     ]
 
     # Una figura por categoría de indicador. El catálogo es la fuente:

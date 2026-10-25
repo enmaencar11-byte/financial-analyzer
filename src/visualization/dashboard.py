@@ -54,6 +54,9 @@ from src.analysis import dupont as mod_dupont
 from src.analysis import eva as mod_eva
 from src.analysis import wacc as mod_wacc
 from src import ratios as mod_ratios
+from src.analysis import horizontal as mod_horizontal
+from src.analysis import vertical as mod_vertical
+from src.config import TODAS_LAS_COLUMNAS
 from src.data_loader import cargar_datos
 from src.utils import UMBRAL_MONTO
 from src.parametros import incorporar
@@ -381,6 +384,75 @@ def pestana_indicadores(df):
         'modo que se excluye.')
 
 
+def pestana_estructura(df):
+    """
+    Análisis vertical y horizontal: la composición y su evolución.
+
+    Son dos preguntas distintas sobre los mismos estados. El vertical
+    expresa cada partida como porcentaje de un total del mismo ejercicio
+    y describe la composición. El horizontal compara cada partida con la
+    del ejercicio anterior o con la de un año base y describe el
+    movimiento.
+
+    Ninguno sirve solo. La composición sin evolución no distingue a un
+    emisor que siempre tuvo esa estructura de uno que acaba de cambiarla;
+    la evolución sin composición no distingue un crecimiento del
+    trescientos por ciento en una partida insignificante de uno del
+    cuatro por ciento en la que manda.
+    """
+    # El análisis se practica sobre las partidas de los estados: los
+    # parámetros de mercado incorporados no son partidas contables.
+    estados = df[TODAS_LAS_COLUMNAS]
+
+    st.subheader('Composición y evolución')
+
+    vertical_, horizontal_ = st.tabs(['Análisis vertical',
+                                      'Análisis horizontal'])
+
+    with vertical_:
+        st.markdown(
+            'Cada partida como porcentaje de un total del mismo ejercicio: '
+            'el activo total en el balance, las ventas netas en el estado '
+            'de resultados. La lectura de márgenes es inmediata, porque la '
+            'fila de utilidad bruta **es** el margen bruto.')
+
+        _figura(lambda: charts.vertical_activo(estados, dir_salida=None))
+        _figura(lambda: charts.vertical_resultados(estados, dir_salida=None))
+
+        cual = st.radio('Tabla', ['Balance general', 'Estado de resultados'],
+                        horizontal=True, key='tabla_vertical')
+        tabla = (mod_vertical.vertical_balance(estados)
+                 if cual == 'Balance general'
+                 else mod_vertical.vertical_resultados(estados))
+        st.dataframe(_formato(tabla, []), hide_index=True)
+
+    with horizontal_:
+        st.markdown(
+            'La variación de cada partida respecto del ejercicio anterior, '
+            'y los números índice respecto de un año base igual a cien. '
+            'Los índices permiten comparar en una misma escala partidas de '
+            'magnitudes muy distintas.')
+
+        _figura(lambda: charts.horizontal_indices(estados, dir_salida=None))
+
+        cual = st.radio(
+            'Tabla', ['Números índice', 'Variación interanual (%)',
+                      'Variación absoluta'],
+            horizontal=True, key='tabla_horizontal')
+        if cual == 'Números índice':
+            tabla = mod_horizontal.numeros_indice(estados)
+        elif cual.startswith('Variación interanual'):
+            tabla = mod_horizontal.variacion_interanual(estados)
+        else:
+            tabla = mod_horizontal.variacion_absoluta(estados)
+        st.dataframe(_formato(tabla, []), hide_index=True)
+
+        st.caption(
+            'El primer ejercicio de cada emisor queda sin variación '
+            'interanual porque no tiene período de comparación. La fila se '
+            'conserva para que las tablas puedan alinearse entre sí.')
+
+
 def pestana_valor(df, tabla_eva, sustitutos, wacc_valor):
     """Creación o destrucción de valor."""
     st.subheader('Creación y destrucción de valor')
@@ -596,11 +668,13 @@ def main():
     tabla_eva = encabezado(df, sustitutos, wacc_valor)
     st.divider()
 
-    (indicadores, valor, sensibilidad, costo, riesgo, rendimiento,
-     validacion) = st.tabs(
-        ['Indicadores', 'Valor', 'Sensibilidad', 'Costo de capital',
-         'Riesgo', 'Rendimiento', 'Validación'])
+    (estructura, indicadores, valor, sensibilidad, costo, riesgo,
+     rendimiento, validacion) = st.tabs(
+        ['Estructura', 'Indicadores', 'Valor', 'Sensibilidad',
+         'Costo de capital', 'Riesgo', 'Rendimiento', 'Validación'])
 
+    with estructura:
+        pestana_estructura(df)
     with indicadores:
         pestana_indicadores(df)
     with valor:

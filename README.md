@@ -49,9 +49,9 @@ modelos de riesgo y de costo de capital que la práctica profesional emplea.
 
 - Libro de Excel de diecinueve hojas, una por análisis, con una hoja de
   validación y otra que registra los parámetros empleados
-- Figuras a trescientos puntos por pulgada, legibles en escala de grises: ocho
-  de los modelos, una por categoría de indicador y una de descomposición del
-  rendimiento por emisor
+- Figuras a trescientos puntos por pulgada, legibles en escala de grises: diez
+  de la estructura y los modelos, una por categoría de indicador, y una de
+  descomposición del rendimiento por cada emisor
 - Panel interactivo con los parámetros del modelo gobernados por controles
   deslizantes
 
