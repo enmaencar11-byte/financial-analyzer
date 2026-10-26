@@ -39,6 +39,8 @@ from src import ratios
 from src.analysis import altman, capm, dupont, eva, horizontal, vertical, wacc
 from src.config import TODAS_LAS_COLUMNAS
 from src.data_loader import cargar_datos
+from src.idioma import t
+from src import idioma
 from src.parametros import incorporar
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -165,8 +167,8 @@ def tabla_validacion(df, resultados):
     desvio = (df['activo_total'] - df['pasivo_total']
               - df['patrimonio_total']).abs()
     filas.append({
-        'Comprobación': 'Cuadre del balance',
-        'Condición': 'Activo = Pasivo + Patrimonio',
+        'Comprobación': t('Cuadre del balance'),
+        'Condición': t('Activo = Pasivo + Patrimonio'),
         'Observaciones': len(desvio),
         'Satisfacen': int((desvio <= TOLERANCIA_CUADRE).sum()),
         'Discrepancia máxima': float(desvio.max()),
@@ -182,7 +184,7 @@ def tabla_validacion(df, resultados):
         if columna in resultados[hoja].columns:
             desvio = (resultados[hoja][columna] - 100).abs()
             filas.append({
-                'Comprobación': etiqueta,
+                'Comprobación': t(etiqueta),
                 'Condición': f'{columna} = 100',
                 'Observaciones': len(desvio),
                 'Satisfacen': int((desvio <= TOLERANCIA_BASE_VERTICAL).sum()),
@@ -194,8 +196,8 @@ def tabla_validacion(df, resultados):
     resumen = dupont.resumen_verificacion(df)
     for nivel in (2, 3):
         filas.append({
-            'Comprobación': f'Identidad DuPont nivel {nivel}',
-            'Condición': 'Producto de los factores = ROE',
+            'Comprobación': t('Identidad DuPont nivel {n}').format(n=nivel),
+            'Condición': t('Producto de los factores = ROE'),
             'Observaciones': resumen['observaciones'],
             'Satisfacen': resumen[f'nivel_{nivel}_coinciden'],
             'Discrepancia máxima': resumen[f'diferencia_maxima_nivel_{nivel}'],
@@ -205,8 +207,8 @@ def tabla_validacion(df, resultados):
     # Equivalencia de las dos formulaciones del valor económico agregado.
     v = resultados['EVA verificacion']
     filas.append({
-        'Comprobación': 'Equivalencia de las formulaciones del EVA',
-        'Condición': 'NOPAT − CI×WACC = (ROIC − WACC)×CI',
+        'Comprobación': t('Equivalencia de las formulaciones del EVA'),
+        'Condición': t('NOPAT − CI×WACC = (ROIC − WACC)×CI'),
         'Observaciones': len(v),
         'Satisfacen': int(v['Coincide'].sum()),
         'Discrepancia máxima': float(v['Diferencia relativa'].max()),
@@ -216,8 +218,8 @@ def tabla_validacion(df, resultados):
     # Cobertura del catálogo de indicadores.
     conteo = ratios.resumen()
     filas.append({
-        'Comprobación': 'Indicadores calculados',
-        'Condición': 'Catálogo completo',
+        'Comprobación': t('Indicadores calculados'),
+        'Condición': t('Catálogo completo'),
         'Observaciones': conteo['TOTAL'],
         'Satisfacen': conteo['TOTAL'],
         'Discrepancia máxima': 0.0,
@@ -226,7 +228,7 @@ def tabla_validacion(df, resultados):
 
     tabla = pd.DataFrame(filas)
     tabla['Resultado'] = [
-        'Satisface' if s == o else 'Revisar'
+        t('Satisface') if s == o else t('Revisar')
         for s, o in zip(tabla['Satisfacen'], tabla['Observaciones'])]
     return tabla
 
@@ -242,13 +244,13 @@ def tabla_parametros(df, wacc_valor, sustitutos):
     reproducible y no quede ambiguo cuál de varios escenarios produjo
     una cifra determinada.
     """
-    filas = [{'Concepto': 'Fecha de ejecución', 'Valor': str(date.today()),
+    filas = [{'Concepto': t('Fecha de ejecución'), 'Valor': str(date.today()),
               'Origen': '—'},
-             {'Concepto': 'Emisores', 'Valor': df['empresa'].nunique(),
+             {'Concepto': t('Emisores'), 'Valor': df['empresa'].nunique(),
               'Origen': 'Datos'},
-             {'Concepto': 'Observaciones', 'Valor': len(df),
+             {'Concepto': t('Observaciones'), 'Valor': len(df),
               'Origen': 'Datos'},
-             {'Concepto': 'Ejercicios',
+             {'Concepto': t('Ejercicios'),
               'Valor': f"{df['anio'].min()}–{df['anio'].max()}",
               'Origen': 'Datos'}]
 
@@ -256,7 +258,7 @@ def tabla_parametros(df, wacc_valor, sustitutos):
         indicado = sustitutos.get(nombre)
         if indicado is not None:
             filas.append({'Concepto': nombre, 'Valor': indicado,
-                          'Origen': 'Instrucción de ejecución'})
+                          'Origen': t('Instrucción de ejecución')})
         elif nombre in capm.PARAMETROS:
             columna = capm.PARAMETROS[nombre]
             if columna in df.columns:
@@ -264,14 +266,14 @@ def tabla_parametros(df, wacc_valor, sustitutos):
                 texto = (f'{valores[0]:.4f}' if len(valores) == 1
                          else f'{min(valores):.4f}–{max(valores):.4f}')
                 filas.append({'Concepto': nombre, 'Valor': texto,
-                              'Origen': 'Archivo de parámetros o datos'})
+                              'Origen': t('Archivo de parámetros o datos')})
         else:
-            filas.append({'Concepto': nombre, 'Valor': 'Calculado',
-                          'Origen': 'Estados financieros'})
+            filas.append({'Concepto': nombre, 'Valor': t('Calculado'),
+                          'Origen': t('Estados financieros')})
 
     if wacc_valor is not None:
-        filas.append({'Concepto': 'wacc impuesto', 'Valor': wacc_valor,
-                      'Origen': 'Instrucción de ejecución'})
+        filas.append({'Concepto': t('wacc impuesto'), 'Valor': wacc_valor,
+                      'Origen': t('Instrucción de ejecución')})
 
     return pd.DataFrame(filas)
 
@@ -292,14 +294,24 @@ def guardar(resultados, archivo=ARCHIVO_SALIDA):
 
     with pd.ExcelWriter(archivo, engine='openpyxl') as libro:
         for nombre, tabla in resultados.items():
-            hoja = nombre[:31]
-            tabla.to_excel(libro, sheet_name=hoja, index=False)
+            # El nombre de hoja se traduce al escribirlo y no al
+            # construirlo: las claves del diccionario son identificadores
+            # internos que el resto del proceso usa para localizar cada
+            # resultado, y traducirlas rompería esas referencias.
+            hoja = t(nombre)[:31]
+
+            # La traducción se practica una sola vez y se usa tanto para
+            # escribir como para medir el ancho de cada columna. Traducir
+            # por separado produciría encabezados que no se corresponden
+            # con la tabla sobre la que se mide.
+            escrita = idioma.traducir_columnas(tabla)
+            escrita.to_excel(libro, sheet_name=hoja, index=False)
 
             hoja_excel = libro.sheets[hoja]
-            for i, columna in enumerate(tabla.columns, start=1):
+            for i, columna in enumerate(escrita.columns, start=1):
                 ancho = max(len(str(columna)),
-                            *(len(f'{v}') for v in tabla[columna].head(50))) \
-                        if len(tabla) else len(str(columna))
+                            *(len(f'{v}') for v in escrita[columna].head(50))) \
+                        if len(escrita) else len(str(columna))
                 hoja_excel.column_dimensions[
                     hoja_excel.cell(row=1, column=i).column_letter
                 ].width = min(max(ancho + 2, 10), 42)
@@ -331,16 +343,16 @@ def resumir(resultados, ancho=78):
     """Imprime la tabla de validación y el resultado del EVA."""
     print()
     print('=' * ancho)
-    print('  VALIDACIÓN — CONSISTENCIA INTERNA')
+    print('  ' + t('VALIDACIÓN — CONSISTENCIA INTERNA'))
     print('=' * ancho)
     validacion = resultados['Validacion'].copy()
     for columna in ('Discrepancia máxima', 'Tolerancia'):
         validacion[columna] = validacion[columna].map(_notacion)
-    print(validacion.to_string(index=False))
+    print(idioma.traducir_columnas(validacion).to_string(index=False))
 
     print()
     print('=' * ancho)
-    print('  RESULTADO POR EMISOR Y EJERCICIO')
+    print('  ' + t('RESULTADO POR EMISOR Y EJERCICIO'))
     print('=' * ancho)
 
     # El WACC se toma de la hoja de EVA y no de la hoja de WACC. Son
@@ -354,10 +366,12 @@ def resumir(resultados, ancho=78):
                           + ['WACC', 'ROIC', 'EVA', 'Resultado']],
         on=IDENTIFICADORES)
     tabla = tabla.rename(columns={'Zona': 'Altman',
-                                  'Resultado': 'Juicio EVA'})
+                                  'Resultado': t('Juicio EVA')})
     tabla['EVA'] = tabla['EVA'].map(
         lambda v: 'n/a' if pd.isna(v) else f'{v:,.0f}')
-    print(tabla.to_string(index=False))
+    tabla['Altman'] = idioma.traducir_valores(tabla['Altman'])
+    tabla[t('Juicio EVA')] = idioma.traducir_valores(tabla[t('Juicio EVA')])
+    print(idioma.traducir_columnas(tabla).to_string(index=False))
 
 
 # ── Línea de instrucciones ───────────────────────────────────────
@@ -377,6 +391,10 @@ def construir_argumentos():
                    help='Libro de Excel que se escribirá.')
     p.add_argument('--silencioso', action='store_true',
                    help='Omite la impresión en pantalla.')
+    p.add_argument('--idioma', default=idioma.POR_OMISION,
+                   choices=list(idioma.IDIOMAS),
+                   help='Idioma de los nombres de hoja, los encabezados y '
+                        'la impresión en pantalla.')
 
     g = p.add_argument_group('parámetros sustituibles')
     g.add_argument('--rf', type=float, help='Tasa libre de riesgo.')
@@ -398,6 +416,11 @@ def main(argv=None):
     """Punto de entrada del proceso."""
     argumentos = construir_argumentos().parse_args(argv)
 
+    # El idioma se fija antes de construir nada: los nombres de hoja y los
+    # encabezados se traducen al escribirse, de modo que fijarlo después
+    # produciría un libro mezclado.
+    idioma.fijar(argumentos.idioma)
+
     sustitutos = {k: getattr(argumentos, k) for k in PARAMETROS_WACC}
     wacc_valor = argumentos.wacc_valor
 
@@ -408,17 +431,23 @@ def main(argv=None):
     if not argumentos.silencioso:
         resumir(resultados)
 
-    pendientes = resultados['Validacion']
-    pendientes = pendientes[pendientes['Resultado'] != 'Satisface']
+    # Se cuenta comparando números y no el texto de la columna
+    # 'Resultado', que se traduce: contrastarlo contra una redacción fija
+    # daría por fallida toda comprobación en otro idioma.
+    validacion = resultados['Validacion']
+    pendientes = validacion[
+        validacion['Satisfacen'] != validacion['Observaciones']]
 
     print()
-    print(f'Libro escrito en {archivo}')
-    print(f'Hojas: {len(resultados)}')
+    print(t('Libro escrito en {archivo}').format(archivo=archivo))
+    print(t('Hojas: {n}').format(n=len(resultados)))
     if len(pendientes):
-        print(f'ATENCIÓN: {len(pendientes)} comprobación(es) no se satisfacen. '
-              f'Revise la hoja Validacion.')
+        print(t('ATENCIÓN: {n} comprobación(es) no se satisfacen. '
+                'Revise la hoja {hoja}.').format(
+                    n=len(pendientes), hoja=t('Validacion')))
     else:
-        print('Todas las comprobaciones de consistencia interna se satisfacen.')
+        print(t('Todas las comprobaciones de consistencia interna se '
+                'satisfacen.'))
 
     return 0
 

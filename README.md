@@ -63,6 +63,23 @@ Avance del sistema: **16 de 17 módulos**.
 
 ---
 
+## Español e inglés
+
+El panel y las figuras se presentan en los dos idiomas. El panel lleva un
+selector en la barra lateral; el proceso por lotes y las figuras admiten
+`--idioma en`.
+
+Se traduce lo que el usuario ve: títulos, ejes, leyendas, rótulos de control,
+nombres de indicador y encabezados de tabla. No se traducen los docstrings ni
+los comentarios del código, que son documentación para quien lo lea.
+
+La clave de cada término es su propia redacción en español, de modo que en
+español la traducción es la función identidad y el camino por omisión no puede
+romperse. Un término sin registrar aparece en español en lugar de provocar un
+error, y `python -m herramientas.traducciones_faltantes` los enumera.
+
+---
+
 ## Parámetros intercambiables
 
 Los parámetros del modelo de costo de capital son estimaciones y no magnitudes
@@ -183,6 +200,7 @@ cambio del resultado al parámetro que efectivamente se movió.
 ```
 src/
 ├── config.py          los nombres de las 48 columnas
+├── idioma.py          traducción de los textos que el usuario ve
 ├── utils.py           división segura y formato de tablas
 ├── etl.py             lee las plantillas .xlsx y produce el CSV
 ├── data_loader.py     lee el CSV y lo valida
@@ -192,6 +210,9 @@ src/
 ├── analysis/          vertical, horizontal, DuPont, Altman, CAPM, WACC, EVA
 ├── visualization/     figuras y panel interactivo
 └── reporting/         generación del reporte en PDF
+
+herramientas/
+└── traducciones_faltantes.py   comprueba que no falte ninguna traducción
 ```
 
 Los datos de los emisores no se versionan; solo la estructura de carpetas. Los

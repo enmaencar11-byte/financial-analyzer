@@ -51,6 +51,7 @@ import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
+from src.idioma import t
 from src.analysis import altman as mod_altman
 from src.analysis import dupont as mod_dupont
 from src.analysis import eva as mod_eva
@@ -304,9 +305,9 @@ def altman(df, dir_salida=DIR_FIGURAS):
                  zorder=3)
 
     eje.set_xticks(anios)
-    eje.set_xlabel('Ejercicio')
-    eje.set_ylabel("Puntaje Z''")
-    eje.set_title("Riesgo de insolvencia — Altman Z'' de cuatro variables")
+    eje.set_xlabel(t('Ejercicio'))
+    eje.set_ylabel(t("Puntaje Z''"))
+    eje.set_title(t("Riesgo de insolvencia — Altman Z'' de cuatro variables"))
     eje.set_ylim(min(0, tabla["Z''"].min() * 1.2),
                  max(superior * 1.2, tabla["Z''"].max() * 1.12))
 
@@ -314,9 +315,9 @@ def altman(df, dir_salida=DIR_FIGURAS):
     # cotejar la leyenda para saber qué significa cada franja.
     limite = eje.get_xlim()
     for texto, altura, color in (
-            ('Zona segura', superior, VERDE),
-            ('Zona gris', (inferior + superior) / 2, AMBAR),
-            ('Zona de peligro', inferior / 2, ROJO)):
+            (t('Zona segura'), superior, VERDE),
+            (t('Zona gris'), (inferior + superior) / 2, AMBAR),
+            (t('Zona de peligro'), inferior / 2, ROJO)):
         if eje.get_ylim()[0] <= altura <= eje.get_ylim()[1]:
             eje.annotate(texto, xy=(limite[1], altura), xytext=(-4, 4),
                          textcoords='offset points', ha='right', va='bottom',
@@ -359,9 +360,9 @@ def roic_wacc(df, dir_salida=DIR_FIGURAS, **sustitutos):
         eje.fill_between(x, roic, wacc_, where=roic < wacc_,
                          color=ROJO, alpha=0.22, interpolate=True)
         eje.plot(x, roic, color=COLORES[0], linewidth=2, marker='o',
-                 markersize=4, label='ROIC')
+                 markersize=4, label=t('ROIC'))
         eje.plot(x, wacc_, color=TINTA_SUAVE, linewidth=2, linestyle='--',
-                 marker='s', markersize=4, label='WACC')
+                 marker='s', markersize=4, label=t('WACC'))
 
         eje.set_title(emisor, fontsize=9)
         eje.set_xticks(anios)
@@ -372,15 +373,15 @@ def roic_wacc(df, dir_salida=DIR_FIGURAS, **sustitutos):
     # área sombreada que ocupa el centro del gráfico, cualquier posición
     # interior se superpone a los datos.
     manejos = [Line2D([], [], color=COLORES[0], linewidth=2, marker='o',
-                      markersize=4, label='ROIC'),
+                      markersize=4, label=t('ROIC')),
                Line2D([], [], color=TINTA_SUAVE, linewidth=2, linestyle='--',
-                      marker='s', markersize=4, label='WACC'),
-               Patch(facecolor=VERDE, alpha=0.22, label='Crea valor'),
-               Patch(facecolor=ROJO, alpha=0.22, label='Destruye valor')]
-    figura.suptitle('Retorno sobre el capital invertido frente a su costo',
+                      marker='s', markersize=4, label=t('WACC')),
+               Patch(facecolor=VERDE, alpha=0.22, label=t('Crea valor')),
+               Patch(facecolor=ROJO, alpha=0.22, label=t('Destruye valor'))]
+    figura.suptitle(t('Retorno sobre el capital invertido frente a su costo'),
                     fontsize=10, fontweight='bold', y=1.0)
-    figura.supxlabel('Ejercicio', fontsize=9)
-    figura.supylabel('Tasa anual', fontsize=9)
+    figura.supxlabel(t('Ejercicio'), fontsize=9)
+    figura.supylabel(t('Tasa anual'), fontsize=9)
     figura.tight_layout()
 
     # La leyenda se coloca DESPUÉS de tight_layout y por debajo del
@@ -440,15 +441,15 @@ def eva(df, dir_salida=DIR_FIGURAS, **sustitutos):
     eje.tick_params(axis='x', which='major', length=0, pad=16)
     eje.tick_params(axis='x', which='minor', length=2)
 
-    eje.set_ylabel('EVA (unidades monetarias)')
-    eje.set_title('Valor económico agregado por emisor y ejercicio')
+    eje.set_ylabel(t('EVA (unidades monetarias)'))
+    eje.set_title(t('Valor económico agregado por emisor y ejercicio'))
     eje.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f'{v:,.0f}'))
     eje.grid(axis='x', visible=False, which='both')
 
     # La leyenda va al pie: dentro del área de trazado se superpondría a
     # las barras, cuya orientación depende del signo y no puede preverse.
-    figura.legend(handles=[Patch(facecolor=VERDE, alpha=0.9, label='Crea valor'),
-                           Patch(facecolor=ROJO, alpha=0.9, label='Destruye valor')],
+    figura.legend(handles=[Patch(facecolor=VERDE, alpha=0.9, label=t('Crea valor')),
+                           Patch(facecolor=ROJO, alpha=0.9, label=t('Destruye valor'))],
                   loc='lower center', ncols=2, fontsize=8,
                   bbox_to_anchor=(0.5, -0.04))
     figura.tight_layout()
@@ -480,10 +481,10 @@ def composicion_wacc(df, dir_salida=DIR_FIGURAS, **sustitutos):
         deuda = sub['Aporte de la deuda'].to_numpy(dtype=float)
 
         eje.bar(x, patrimonio, width=0.62, color=COLORES[0], alpha=0.9,
-                edgecolor='white', linewidth=1.2, label='Patrimonio')
+                edgecolor='white', linewidth=1.2, label=t('Patrimonio'))
         eje.bar(x, deuda, width=0.62, bottom=patrimonio, color=COLORES[1],
                 alpha=0.9, edgecolor='white', linewidth=1.2,
-                hatch='///', label='Deuda')
+                hatch='///', label=t('Deuda'))
 
         for xi, total in zip(x, patrimonio + deuda):
             eje.annotate(f'{total:.1%}', xy=(xi, total), xytext=(0, 3),
@@ -501,7 +502,7 @@ def composicion_wacc(df, dir_salida=DIR_FIGURAS, **sustitutos):
     manejos, etiquetas = ejes[0].get_legend_handles_labels()
     figura.legend(manejos, etiquetas, loc='lower center', ncols=2,
                   fontsize=7.5, bbox_to_anchor=(0.5, -0.11))
-    figura.suptitle('Composición del costo promedio ponderado de capital',
+    figura.suptitle(t('Composición del costo promedio ponderado de capital'),
                     fontsize=10, fontweight='bold', y=1.0)
     figura.tight_layout()
     return _guardar(figura, '04_composicion_wacc', dir_salida)
@@ -551,7 +552,7 @@ def indicadores(df, categoria, dir_salida=DIR_FIGURAS):
                      label=emisor)
 
         _escala_factor(eje, tabla[nombre])
-        eje.set_title(nombre, fontsize=8)
+        eje.set_title(t(nombre), fontsize=8)
         eje.set_xticks(anios)
         eje.tick_params(labelsize=7)
 
@@ -563,8 +564,8 @@ def indicadores(df, categoria, dir_salida=DIR_FIGURAS):
     figura.legend(handles=manejos, loc='lower center',
                   ncols=min(3, len(emisores)), fontsize=7.5,
                   bbox_to_anchor=(0.5, -0.09))
-    figura.suptitle(f'Indicadores de {categoria.lower()} — evolución '
-                    f'{anios[0]}–{anios[-1]}',
+    figura.suptitle(t('Indicadores de {cat} — evolución {a}–{b}').format(
+                        cat=t(categoria.lower()), a=anios[0], b=anios[-1]),
                     fontsize=10, fontweight='bold', y=1.0)
     figura.tight_layout()
 
@@ -653,11 +654,11 @@ def dupont_factores(df, dir_salida=DIR_FIGURAS, nivel=3):
                      label=emisor)
 
         _escala_factor(eje, tabla[factor])
-        eje.set_title(factor, fontsize=8.5)
+        eje.set_title(t(factor), fontsize=8.5)
         eje.set_xticks(anios)
         eje.tick_params(labelsize=7)
 
-    ejes[-1].set_title('ROE (producto de los factores)', fontsize=8.5)
+    ejes[-1].set_title(t('ROE (producto de los factores)'), fontsize=8.5)
 
     manejos = [Line2D([], [], color=_estilo_serie(e)[0],
                       linestyle=_estilo_serie(e)[1],
@@ -667,7 +668,7 @@ def dupont_factores(df, dir_salida=DIR_FIGURAS, nivel=3):
     figura.legend(handles=manejos, loc='lower center',
                   ncols=min(3, len(emisores)), fontsize=7.5,
                   bbox_to_anchor=(0.5, -0.11))
-    figura.suptitle(f'Descomposición DuPont de nivel {nivel} — evolución por factor',
+    figura.suptitle(t('Descomposición DuPont de nivel {n} — evolución por factor').format(n=nivel),
                     fontsize=10, fontweight='bold', y=1.0)
     figura.tight_layout()
     return _guardar(figura, f'05_dupont_factores_nivel{nivel}', dir_salida)
@@ -765,9 +766,10 @@ def dupont_contribucion(df, emisor=None, dir_salida=DIR_FIGURAS, nivel=3,
     eje.set_ylim(piso - holgura, tope + holgura)
 
     eje.set_xticks(np.arange(len(aportes) + 1))
-    eje.set_xticklabels(nombres + ['Total'], rotation=18, ha='right',
+    eje.set_xticklabels([t(n) for n in nombres] + [t('Total')],
+                        rotation=18, ha='right',
                         fontsize=8)
-    eje.set_ylabel('Aporte a la variación del ROE (%)')
+    eje.set_ylabel(t('Aporte a la variación del ROE (%)'))
     eje.grid(axis='x', visible=False)
 
     # El encabezado declara la variación efectiva del rendimiento, sin la
@@ -778,15 +780,15 @@ def dupont_contribucion(df, emisor=None, dir_salida=DIR_FIGURAS, nivel=3,
         final = float(fila_total[columnas_valor[1]].squeeze())
         etiqueta_i = columnas_valor[0].split()[-1]
         etiqueta_f = columnas_valor[1].split()[-1]
-        subtitulo = (f'El ROE pasó de {inicial:.2%} en {etiqueta_i} '
-                     f'a {final:.2%} en {etiqueta_f}')
+        subtitulo = (t('El ROE pasó de {i} en {ai} a {f} en {af}').format(
+            i=f'{inicial:.2%}', ai=etiqueta_i, f=f'{final:.2%}', af=etiqueta_f))
 
-    eje.set_title(f'Aporte de cada factor a la variación del ROE — {emisor}')
+    eje.set_title(t('Aporte de cada factor a la variación del ROE — {e}').format(e=emisor))
     if subtitulo:
         eje.annotate(subtitulo, xy=(0.5, 1.015), xycoords='axes fraction',
                      ha='center', va='bottom', fontsize=8,
                      color=TINTA_SUAVE)
-        eje.set_title(f'Aporte de cada factor a la variación del ROE — {emisor}',
+        eje.set_title(t('Aporte de cada factor a la variación del ROE — {e}').format(e=emisor),
                       pad=22)
 
     figura.tight_layout()
@@ -864,12 +866,12 @@ def sensibilidad_eva(df, dir_salida=DIR_FIGURAS, valores=None):
     eje.axhline(0, color=TINTA, linewidth=1.1, zorder=2)
     eje.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f'{v:.0%}'))
     eje.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f'{v:,.0f}'))
-    eje.set_xlabel('Costo promedio ponderado de capital supuesto')
-    eje.set_ylabel('EVA promedio del período')
-    eje.set_title('Sensibilidad del valor económico agregado al costo de capital')
+    eje.set_xlabel(t('Costo promedio ponderado de capital supuesto'))
+    eje.set_ylabel(t('EVA promedio del período'))
+    eje.set_title(t('Sensibilidad del valor económico agregado al costo de capital'))
     # En la esquina inferior izquierda, que es la única región que las
     # curvas descendentes dejan libre en todos los casos.
-    eje.annotate('Por encima del eje cero el emisor crea valor',
+    eje.annotate(t('Por encima del eje cero el emisor crea valor'),
                  xy=(0.015, 0.03), xycoords='axes fraction',
                  fontsize=7, style='italic', color=TINTA_SUAVE)
     eje.legend(loc='upper right', ncols=1)
@@ -916,12 +918,12 @@ def vertical_activo(df, dir_salida=DIR_FIGURAS, partidas=None):
                     color=COLORES[k % len(COLORES)], alpha=0.9,
                     edgecolor='white', linewidth=1.2,
                     hatch=TRAMAS[k % len(TRAMAS)],
-                    label=nombres.get(partida, partida))
+                    label=t(nombres.get(partida, partida)))
             acumulado += valores
 
         resto = 100 - acumulado
         eje.bar(x, resto, width=0.62, bottom=acumulado, color=REJILLA,
-                edgecolor='white', linewidth=1.2, label='Resto del activo')
+                edgecolor='white', linewidth=1.2, label=t('Resto del activo'))
 
         eje.set_title(emisor, fontsize=9)
         eje.set_xticks(x)
@@ -934,7 +936,7 @@ def vertical_activo(df, dir_salida=DIR_FIGURAS, partidas=None):
     figura.legend(manejos, etiquetas, loc='lower center',
                   ncols=min(3, len(etiquetas)), fontsize=7.5,
                   bbox_to_anchor=(0.5, -0.12))
-    figura.suptitle('Composición del activo total — análisis vertical',
+    figura.suptitle(t('Composición del activo total — análisis vertical'),
                     fontsize=10, fontweight='bold', y=1.0)
     figura.tight_layout()
     return _guardar(figura, '08_vertical_activo', dir_salida)
@@ -984,7 +986,7 @@ def vertical_resultados(df, dir_salida=DIR_FIGURAS):
             eje.bar(x, valores, width=0.62, bottom=acumulado,
                     color=COLORES[k % len(COLORES)], alpha=0.9,
                     edgecolor='white', linewidth=1.2,
-                    hatch=TRAMAS[k % len(TRAMAS)], label=etiqueta)
+                    hatch=TRAMAS[k % len(TRAMAS)], label=t(etiqueta))
             acumulado += valores
 
         # La utilidad neta se rotula por ser la cifra que el lector busca.
@@ -1003,7 +1005,7 @@ def vertical_resultados(df, dir_salida=DIR_FIGURAS):
     manejos, etiquetas = ejes[0].get_legend_handles_labels()
     figura.legend(manejos, etiquetas, loc='lower center', ncols=3,
                   fontsize=7.5, bbox_to_anchor=(0.5, -0.14))
-    figura.suptitle('Estructura del estado de resultados — análisis vertical',
+    figura.suptitle(t('Estructura del estado de resultados — análisis vertical'),
                     fontsize=10, fontweight='bold', y=1.0)
     figura.tight_layout()
     return _guardar(figura, '10_vertical_resultados', dir_salida)
@@ -1053,7 +1055,7 @@ def horizontal_indices(df, dir_salida=DIR_FIGURAS, partidas=None,
             eje.plot(sub['anio'], sub[partida], color=COLORES[k % len(COLORES)],
                      linestyle=TRAZOS[k % len(TRAZOS)],
                      marker=MARCADORES[k % len(MARCADORES)], markersize=4,
-                     linewidth=1.6, label=nombres.get(partida, partida))
+                     linewidth=1.6, label=t(nombres.get(partida, partida)))
 
         # La referencia: por encima de cien la partida creció.
         eje.axhline(100, color=TINTA_SUAVE, linewidth=0.9, linestyle='--',
@@ -1066,8 +1068,7 @@ def horizontal_indices(df, dir_salida=DIR_FIGURAS, partidas=None,
     figura.legend(manejos, etiquetas, loc='lower center', ncols=3,
                   fontsize=7.5, bbox_to_anchor=(0.5, -0.16))
     base = anio_base or anios[0]
-    figura.suptitle(f'Evolución de las magnitudes principales — '
-                    f'{base} = 100', fontsize=10, fontweight='bold', y=1.0)
+    figura.suptitle(t('Evolución de las magnitudes principales — {b} = 100').format(b=base), fontsize=10, fontweight='bold', y=1.0)
     figura.tight_layout()
     return _guardar(figura, '11_horizontal_indices', dir_salida)
 
@@ -1130,10 +1131,27 @@ def generar_todos(df, dir_salida=DIR_FIGURAS, por_emisor=True, **sustitutos):
 
 
 if __name__ == '__main__':
+    import argparse
+
+    from src import idioma
     from src.data_loader import cargar_datos
     from src.parametros import incorporar
 
-    print(f'\nGenerando figuras en {DIR_FIGURAS}\n')
+    argumentos = argparse.ArgumentParser(
+        prog='python -m src.visualization.charts',
+        description='Genera las figuras del capítulo de resultados.')
+    argumentos.add_argument('--idioma', default=idioma.POR_OMISION,
+                            choices=list(idioma.IDIOMAS),
+                            help='Idioma de los títulos, ejes y leyendas.')
+    argumentos.add_argument('--salida', default=str(DIR_FIGURAS),
+                            help='Carpeta donde escribir las figuras.')
+    opciones = argumentos.parse_args()
+
+    # El idioma se fija antes de dibujar: los rótulos se traducen al
+    # construir cada figura y no admiten cambio posterior.
+    idioma.fijar(opciones.idioma)
+
+    print(f'\nGenerando figuras en {opciones.salida}\n')
     datos = incorporar(cargar_datos(
         RAIZ / 'data' / 'processed' / 'emisores_consolidado.csv'))
-    generar_todos(datos)
+    generar_todos(datos, opciones.salida)

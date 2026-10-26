@@ -48,6 +48,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
+from src.idioma import t
+from src import idioma
 from src.analysis import altman as mod_altman
 from src.analysis import capm as mod_capm
 from src.analysis import dupont as mod_dupont
@@ -64,7 +66,7 @@ from src.visualization import charts
 
 ARCHIVO_ENTRADA = RAIZ / 'data' / 'processed' / 'emisores_consolidado.csv'
 
-IDENTIFICADORES = ['empresa', 'anio']
+IDENTIFICADORES = ['empresa', 'anio', 'issuer', 'year']
 
 # Intervalos de los controles. Se fijan con holgura sobre los valores
 # plausibles del mercado dominicano: un control que no alcance los
@@ -119,6 +121,29 @@ def valores_de_archivo(df):
     return base
 
 
+# ── Idioma ───────────────────────────────────────────────────────
+
+def selector_idioma():
+    """
+    Fija el idioma antes de que se dibuje nada de la página.
+
+    El orden importa. Streamlit ejecuta el script de arriba abajo, de
+    modo que todo rótulo escrito antes de leer este control conservaría
+    el idioma de la pasada anterior: el título y el subtítulo quedarían
+    en español dentro de una página en inglés hasta la interacción
+    siguiente.
+    """
+    codigos = list(idioma.IDIOMAS)
+    elegido = st.sidebar.radio(
+        'Idioma / Language', codigos,
+        index=codigos.index(idioma.actual()),
+        format_func=lambda c: idioma.IDIOMAS[c],
+        horizontal=True, key='idioma')
+    idioma.fijar(elegido)
+    st.sidebar.divider()
+    return elegido
+
+
 # ── Selección de la muestra ──────────────────────────────────────
 
 def seleccionar(df):
@@ -145,20 +170,20 @@ def seleccionar(df):
     completos = list(dict.fromkeys(df['empresa']))
     charts.fijar_universo(completos)
 
-    st.sidebar.title('Muestra')
+    st.sidebar.title(t('Muestra'))
 
     elegidos = st.sidebar.multiselect(
-        'Emisores', options=completos, default=completos,
-        help='Elija uno para el análisis individual, o varios para '
-             'compararlos. El color de cada emisor no cambia al filtrar.')
+        t('Emisores'), options=completos, default=completos,
+        help=t('Elija uno para el análisis individual, o varios para '
+             'compararlos. El color de cada emisor no cambia al filtrar.'))
 
     anios = sorted(df['anio'].unique())
     if len(anios) > 1:
         desde, hasta = st.sidebar.select_slider(
-            'Ejercicios', options=anios, value=(anios[0], anios[-1]),
-            help='Acota el período. El análisis horizontal y la '
+            t('Ejercicios'), options=anios, value=(anios[0], anios[-1]),
+            help=t('Acota el período. El análisis horizontal y la '
                  'descomposición de la variación toman como base el '
-                 'primer ejercicio del intervalo.')
+                 'primer ejercicio del intervalo.'))
     else:
         desde = hasta = anios[0]
 
@@ -166,12 +191,13 @@ def seleccionar(df):
                   & df['anio'].between(desde, hasta)].reset_index(drop=True)
 
     if filtrado.empty:
-        st.sidebar.error('La selección no deja observaciones.')
+        st.sidebar.error(t('La selección no deja observaciones.'))
     else:
         total = len(completos)
         if len(elegidos) < total or (desde, hasta) != (anios[0], anios[-1]):
-            st.sidebar.info(f'{len(elegidos)} de {total} emisores · '
-                            f'ejercicios {desde}–{hasta}')
+            st.sidebar.info(
+                t('{n} de {total} emisores · ejercicios {a}–{b}').format(
+                    n=len(elegidos), total=total, a=desde, b=hasta))
 
     st.sidebar.divider()
     return filtrado
@@ -191,48 +217,48 @@ def barra_lateral(df):
     base = valores_de_archivo(df)
     sustitutos, activos = {}, []
 
-    st.sidebar.title('Parámetros del modelo')
+    st.sidebar.title(t('Parámetros del modelo'))
     st.sidebar.caption(
-        'Cada parámetro parte del valor registrado en el archivo. '
+        t('Cada parámetro parte del valor registrado en el archivo. '
         'Actívelo para sustituirlo y observar el efecto sobre el '
-        'resultado.')
+        'resultado.'))
 
     for nombre, (etiqueta, minimo, maximo, paso, ayuda) in CONTROLES.items():
         inicial = base.get(nombre, (minimo + maximo) / 2)
-        activo = st.sidebar.checkbox(etiqueta, value=False, key=f'ok_{nombre}',
-                                     help=ayuda)
+        activo = st.sidebar.checkbox(t(etiqueta), value=False,
+                                     key=f'ok_{nombre}', help=t(ayuda))
         valor = st.sidebar.slider(
-            etiqueta, min_value=float(minimo), max_value=float(maximo),
+            t(etiqueta), min_value=float(minimo), max_value=float(maximo),
             value=float(min(max(inicial, minimo), maximo)), step=float(paso),
             key=f'v_{nombre}', disabled=not activo,
             label_visibility='collapsed',
             format='%.4f' if paso < 0.01 else '%.2f')
         if activo:
             sustitutos[nombre] = valor
-            activos.append(f'{etiqueta}: {valor:.4f}')
+            activos.append(f'{t(etiqueta)}: {valor:.4f}')
 
     st.sidebar.divider()
-    st.sidebar.subheader('Costo de capital impuesto')
+    st.sidebar.subheader(t('Costo de capital impuesto'))
     st.sidebar.caption(
-        'Reemplaza al costo promedio ponderado que el modelo calcula. '
+        t('Reemplaza al costo promedio ponderado que el modelo calcula. '
         'Sirve para contrastar el resultado frente a un costo de capital '
-        'objetivo, sin recorrer la cadena completa del modelo.')
-    imponer = st.sidebar.checkbox('Imponer un WACC', value=False)
+        'objetivo, sin recorrer la cadena completa del modelo.'))
+    imponer = st.sidebar.checkbox(t('Imponer un WACC'), value=False)
     wacc_valor = st.sidebar.slider(
-        'WACC impuesto', 0.04, 0.20, 0.10, 0.0025,
+        t('WACC impuesto'), 0.04, 0.20, 0.10, 0.0025,
         disabled=not imponer, label_visibility='collapsed',
         format='%.4f') if True else None
     if not imponer:
         wacc_valor = None
     else:
-        activos.append(f'WACC impuesto: {wacc_valor:.4f}')
+        activos.append(f"{t('WACC impuesto')}: {wacc_valor:.4f}")
 
     st.sidebar.divider()
     if activos:
-        st.sidebar.warning('Parámetros sustituidos:\n\n'
+        st.sidebar.warning(t('Parámetros sustituidos:') + '\n\n'
                            + '\n\n'.join(f'- {a}' for a in activos))
     else:
-        st.sidebar.success('Todos los parámetros provienen del archivo.')
+        st.sidebar.success(t('Todos los parámetros provienen del archivo.'))
 
     return sustitutos, wacc_valor
 
@@ -265,30 +291,31 @@ def encabezado(df, sustitutos, wacc_valor):
 
     c1, c2, c3, c4 = st.columns(4)
 
-    c1.metric('Emisores', df['empresa'].nunique(),
-              help='Emisores incluidos en la selección actual.')
+    c1.metric(t('Emisores'), df['empresa'].nunique(),
+              help=t('Emisores incluidos en la selección actual.'))
 
     c2.metric(
-        'WACC promedio', f"{actual['wacc_medio']:.2%}",
+        t('WACC promedio'), f"{actual['wacc_medio']:.2%}",
         delta=(f"{actual['wacc_medio'] - base['wacc_medio']:+.2%}"
                if hay_cambio else None),
         delta_color='inverse',
-        help='Promedio simple del costo promedio ponderado de capital '
-             'sobre todas las observaciones.')
+        help=t('Promedio simple del costo promedio ponderado de capital '
+             'sobre todas las observaciones.'))
 
     c3.metric(
-        'EVA agregado', f"{actual['eva_total']:,.0f}",
+        t('EVA agregado'), f"{actual['eva_total']:,.0f}",
         delta=(f"{actual['eva_total'] - base['eva_total']:+,.0f}"
                if hay_cambio else None),
-        help='Suma del valor económico agregado de todos los emisores y '
-             'ejercicios.')
+        help=t('Suma del valor económico agregado de todos los emisores y '
+             'ejercicios.'))
 
     c4.metric(
-        'Observaciones que crean valor',
-        f"{actual['crean']} de {actual['observaciones']}",
+        t('Observaciones que crean valor'),
+        t('{n} de {total}').format(n=actual['crean'],
+                                   total=actual['observaciones']),
         delta=(f"{actual['crean'] - base['crean']:+d}"
                if hay_cambio else None),
-        help='Observaciones con valor económico agregado positivo.')
+        help=t('Observaciones con valor económico agregado positivo.'))
 
     return actual['tabla']
 
@@ -310,6 +337,23 @@ def _figura(constructor):
     # anteriores, donde width no existe.
     st.pyplot(figura)
     plt.close(figura)
+
+
+def _tabla(tabla, porcentajes=()):
+    """
+    Presenta una tabla con sus encabezados y sus valores de texto
+    traducidos al idioma vigente.
+
+    Los nombres de emisor no se traducen: son nombres propios. Sí se
+    traducen las columnas y los valores de clasificación —las zonas de
+    Altman, el veredicto del EVA—, que son términos del modelo y no
+    datos del emisor.
+    """
+    tabla = idioma.traducir_columnas(tabla)
+    for columna in tabla.columns:
+        if tabla[columna].dtype == object and columna not in ('issuer', 'empresa'):
+            tabla[columna] = idioma.traducir_valores(tabla[columna])
+    return _formato(tabla, [t(c) for c in porcentajes])
 
 
 def _formato(tabla, porcentajes):
@@ -352,36 +396,39 @@ def pestana_indicadores(df):
     """
     conteo = mod_ratios.resumen()
 
-    st.subheader('Razones financieras')
+    st.subheader(t('Razones financieras'))
     st.markdown(
-        f'El sistema calcula **{conteo["TOTAL"]} indicadores** agrupados en '
-        f'cuatro categorías. Ninguno responde por sí solo si la empresa va '
-        f'bien: el margen neto no sabe si puede pagar la nómina del mes, y '
-        f'la razón corriente no sabe si el negocio es rentable. Se leen en '
-        f'conjunto.')
+        t('El sistema calcula **{n} indicadores** agrupados en cuatro '
+          'categorías. Ninguno responde por sí solo si la empresa va bien: '
+          'el margen neto no sabe si puede pagar la nómina del mes, y la '
+          'razón corriente no sabe si el negocio es rentable. Se leen en '
+          'conjunto.').format(n=conteo['TOTAL']))
 
     columnas = st.columns(len(mod_ratios.CATEGORIAS))
     for columna, categoria in zip(columnas, mod_ratios.CATEGORIAS):
-        columna.metric(categoria, conteo.get(categoria, 0))
+        columna.metric(t(categoria), conteo.get(categoria, 0))
 
     st.divider()
 
+    # format_func traduce lo que se muestra sin alterar el valor que la
+    # función devuelve: el código sigue recibiendo el nombre en español,
+    # que es la clave con que el catálogo identifica cada categoría.
     categoria = st.radio(
-        'Categoría', mod_ratios.CATEGORIAS, horizontal=True,
-        help='Cada categoría responde una pregunta distinta sobre la '
-             'misma empresa.')
+        t('Categoría'), mod_ratios.CATEGORIAS, horizontal=True, format_func=t,
+        help=t('Cada categoría responde una pregunta distinta sobre la '
+             'misma empresa.'))
 
     _figura(lambda: charts.indicadores(df, categoria, dir_salida=None))
 
     tabla = mod_ratios.calcular_todos(df, categoria=categoria)
-    st.dataframe(_formato(tabla, []), hide_index=True)
+    st.dataframe(_tabla(tabla, []), hide_index=True)
 
     st.caption(
-        'Un valor ausente indica que el indicador no aplica al emisor y '
+        t('Un valor ausente indica que el indicador no aplica al emisor y '
         'ejercicio correspondientes, no que valga cero. Un ROE calculado '
         'sobre patrimonio negativo, por ejemplo, resultaría positivo por '
         'cancelación de signos y carecería de significado económico, de '
-        'modo que se excluye.')
+        'modo que se excluye.'))
 
 
 def pestana_estructura(df):
@@ -404,64 +451,64 @@ def pestana_estructura(df):
     # parámetros de mercado incorporados no son partidas contables.
     estados = df[TODAS_LAS_COLUMNAS]
 
-    st.subheader('Composición y evolución')
+    st.subheader(t('Composición y evolución'))
 
-    vertical_, horizontal_ = st.tabs(['Análisis vertical',
-                                      'Análisis horizontal'])
+    vertical_, horizontal_ = st.tabs([t('Análisis vertical'),
+                                      t('Análisis horizontal')])
 
     with vertical_:
         st.markdown(
-            'Cada partida como porcentaje de un total del mismo ejercicio: '
+            t('Cada partida como porcentaje de un total del mismo ejercicio: '
             'el activo total en el balance, las ventas netas en el estado '
             'de resultados. La lectura de márgenes es inmediata, porque la '
-            'fila de utilidad bruta **es** el margen bruto.')
+            'fila de utilidad bruta **es** el margen bruto.'))
 
         _figura(lambda: charts.vertical_activo(estados, dir_salida=None))
         _figura(lambda: charts.vertical_resultados(estados, dir_salida=None))
 
-        cual = st.radio('Tabla', ['Balance general', 'Estado de resultados'],
-                        horizontal=True, key='tabla_vertical')
+        cual = st.radio(t('Tabla'), ['Balance general', 'Estado de resultados'],
+                        horizontal=True, format_func=t, key='tabla_vertical')
         tabla = (mod_vertical.vertical_balance(estados)
                  if cual == 'Balance general'
                  else mod_vertical.vertical_resultados(estados))
-        st.dataframe(_formato(tabla, []), hide_index=True)
+        st.dataframe(_tabla(tabla, []), hide_index=True)
 
     with horizontal_:
         st.markdown(
-            'La variación de cada partida respecto del ejercicio anterior, '
+            t('La variación de cada partida respecto del ejercicio anterior, '
             'y los números índice respecto de un año base igual a cien. '
             'Los índices permiten comparar en una misma escala partidas de '
-            'magnitudes muy distintas.')
+            'magnitudes muy distintas.'))
 
         _figura(lambda: charts.horizontal_indices(estados, dir_salida=None))
 
         cual = st.radio(
-            'Tabla', ['Números índice', 'Variación interanual (%)',
-                      'Variación absoluta'],
-            horizontal=True, key='tabla_horizontal')
+            t('Tabla'), ['Números índice', 'Variación interanual (%)',
+                         'Variación absoluta'],
+            horizontal=True, format_func=t, key='tabla_horizontal')
         if cual == 'Números índice':
             tabla = mod_horizontal.numeros_indice(estados)
         elif cual.startswith('Variación interanual'):
             tabla = mod_horizontal.variacion_interanual(estados)
         else:
             tabla = mod_horizontal.variacion_absoluta(estados)
-        st.dataframe(_formato(tabla, []), hide_index=True)
+        st.dataframe(_tabla(tabla, []), hide_index=True)
 
         st.caption(
-            'El primer ejercicio de cada emisor queda sin variación '
+            t('El primer ejercicio de cada emisor queda sin variación '
             'interanual porque no tiene período de comparación. La fila se '
-            'conserva para que las tablas puedan alinearse entre sí.')
+            'conserva para que las tablas puedan alinearse entre sí.'))
 
 
 def pestana_valor(df, tabla_eva, sustitutos, wacc_valor):
     """Creación o destrucción de valor."""
-    st.subheader('Creación y destrucción de valor')
+    st.subheader(t('Creación y destrucción de valor'))
     st.markdown(
-        'El valor económico agregado contrasta el resultado operativo '
+        t('El valor económico agregado contrasta el resultado operativo '
         'después de impuestos con el costo del capital empleado para '
         'generarlo. Una empresa puede presentar utilidad contable '
         'positiva y destruir valor económico, si el rendimiento del '
-        'capital invertido no compensa el costo de los recursos.')
+        'capital invertido no compensa el costo de los recursos.'))
 
     _figura(lambda: charts.eva(df, dir_salida=None,
                                **({'wacc_valor': wacc_valor} if wacc_valor
@@ -471,53 +518,53 @@ def pestana_valor(df, tabla_eva, sustitutos, wacc_valor):
                                         if wacc_valor else {}),
                                      **sustitutos))
 
-    st.dataframe(_formato(tabla_eva, ['ROIC', 'WACC',
+    st.dataframe(_tabla(tabla_eva, ['ROIC', 'WACC',
                                           'Diferencial ROIC − WACC']),
                  hide_index=True)
 
 
 def pestana_sensibilidad(df):
     """Umbral de creación de valor."""
-    st.subheader('Sensibilidad al costo de capital')
+    st.subheader(t('Sensibilidad al costo de capital'))
     st.markdown(
-        'El umbral es la cifra que acota la conclusión. Por encima de ese '
+        t('El umbral es la cifra que acota la conclusión. Por encima de ese '
         'costo de capital el emisor destruye valor; por debajo, lo crea. '
         'La distancia que lo separa del costo estimado indica cuán '
-        'robusta es la conclusión frente al supuesto adoptado.')
+        'robusta es la conclusión frente al supuesto adoptado.'))
     _figura(lambda: charts.sensibilidad_eva(df, dir_salida=None))
 
     st.caption(
-        'La figura emplea los parámetros del archivo con independencia de '
+        t('La figura emplea los parámetros del archivo con independencia de '
         'los controles, pues su objeto es precisamente recorrer el '
-        'intervalo completo de costos de capital posibles.')
+        'intervalo completo de costos de capital posibles.'))
 
 
 def pestana_costo(df, sustitutos):
     """Costo del capital."""
-    st.subheader('Costo del capital')
+    st.subheader(t('Costo del capital'))
     st.markdown(
-        'El costo promedio ponderado combina el costo del patrimonio, '
+        t('El costo promedio ponderado combina el costo del patrimonio, '
         'estimado por el modelo de valoración de activos de capital, con '
         'el costo de la deuda, obtenido de los estados financieros. El '
         'endeudamiento incide en dos direcciones opuestas: incrementa el '
         'riesgo que percibe el accionista y, a la vez, aumenta la '
-        'participación de una fuente más barata y fiscalmente deducible.')
+        'participación de una fuente más barata y fiscalmente deducible.'))
 
     _figura(lambda: charts.composicion_wacc(df, dir_salida=None, **sustitutos))
 
     izquierda, derecha = st.columns(2)
     with izquierda:
-        st.markdown('**Costo del patrimonio**')
+        st.markdown(t('**Costo del patrimonio**'))
         st.dataframe(
-            _formato(mod_capm.calcular(
+            _tabla(mod_capm.calcular(
                 df, **{k: v for k, v in sustitutos.items() if k != 'kd'}),
                 ['Rf', 'ERP', 'CRP', 'Tasa impuesto', 'Ke',
                  'Prima por riesgo sistemático']),
             hide_index=True)
     with derecha:
-        st.markdown('**Costo promedio ponderado**')
+        st.markdown(t('**Costo promedio ponderado**'))
         st.dataframe(
-            _formato(mod_wacc.calcular(df, **sustitutos),
+            _tabla(mod_wacc.calcular(df, **sustitutos),
                          ['Peso patrimonio', 'Peso deuda', 'Ke', 'Kd',
                           'Kd después de impuestos', 'WACC',
                           'Aporte del patrimonio', 'Aporte de la deuda']),
@@ -526,43 +573,43 @@ def pestana_costo(df, sustitutos):
 
 def pestana_riesgo(df):
     """Riesgo de insolvencia."""
-    st.subheader('Riesgo de insolvencia')
+    st.subheader(t('Riesgo de insolvencia'))
     st.markdown(
-        "El puntaje Z'' de cuatro variables corresponde a empresas sin "
+        t("El puntaje Z'' de cuatro variables corresponde a empresas sin "
         'cotización bursátil, que es la condición de los emisores '
         'dominicanos del mercado de valores: colocan deuda y no acciones, '
-        'de modo que no existe precio de mercado de su patrimonio.')
+        'de modo que no existe precio de mercado de su patrimonio.'))
 
     _figura(lambda: charts.altman(df, dir_salida=None))
 
     tabla = mod_altman.calcular(df)
-    st.dataframe(tabla, hide_index=True)
+    st.dataframe(_tabla(tabla), hide_index=True)
 
     conteo = mod_altman.resumen_zonas(df)
     c1, c2, c3 = st.columns(3)
-    c1.metric('Zona segura', conteo.get('Segura', 0))
-    c2.metric('Zona gris', conteo.get('Gris', 0))
-    c3.metric('Zona de peligro', conteo.get('Peligro', 0))
+    c1.metric(t('Zona segura'), conteo.get('Segura', 0))
+    c2.metric(t('Zona gris'), conteo.get('Gris', 0))
+    c3.metric(t('Zona de peligro'), conteo.get('Peligro', 0))
 
 
 def pestana_rendimiento(df):
     """Descomposición del rendimiento."""
-    st.subheader('Descomposición del rendimiento')
+    st.subheader(t('Descomposición del rendimiento'))
     st.markdown(
-        'El rendimiento sobre el patrimonio es el producto de sus '
+        t('El rendimiento sobre el patrimonio es el producto de sus '
         'factores, no su suma. La descomposición permite atribuir una '
         'variación a su causa: el desempeño de la operación, el costo del '
         'financiamiento o la carga tributaria, cada una de las cuales '
-        'exige una respuesta distinta.')
+        'exige una respuesta distinta.'))
 
-    nivel = st.radio('Nivel de descomposición', [2, 3], index=1,
+    nivel = st.radio(t('Nivel de descomposición'), [2, 3], index=1,
                      horizontal=True,
-                     help='El nivel 2 descompone en tres factores; el '
+                     help=t('El nivel 2 descompone en tres factores; el '
                           'nivel 3 desagrega el margen neto en carga '
-                          'fiscal, carga financiera y margen operativo.')
+                          'fiscal, carga financiera y margen operativo.'))
     _figura(lambda: charts.dupont_factores(df, dir_salida=None, nivel=nivel))
 
-    emisor = st.selectbox('Emisor para la descomposición de la variación',
+    emisor = st.selectbox(t('Emisor para la descomposición de la variación'),
                           charts._emisores(df))
     try:
         _figura(lambda: charts.dupont_contribucion(df, emisor,
@@ -571,59 +618,62 @@ def pestana_rendimiento(df):
     except ValueError as error:
         st.info(str(error))
 
-    st.dataframe(mod_dupont.dupont_nivel_3(df) if nivel == 3
-                 else mod_dupont.dupont_nivel_2(df),
+    st.dataframe(_tabla(mod_dupont.dupont_nivel_3(df) if nivel == 3
+                        else mod_dupont.dupont_nivel_2(df)),
                  hide_index=True)
 
 
 def pestana_validacion(df, sustitutos, wacc_valor):
     """Consistencia interna."""
-    st.subheader('Consistencia interna')
+    st.subheader(t('Consistencia interna'))
     st.markdown(
-        'Las identidades algebraicas del sistema se comprueban en cada '
+        t('Las identidades algebraicas del sistema se comprueban en cada '
         'ejecución. Son verificaciones de consistencia interna: contrastan '
         'el sistema contra sí mismo y no contra una fuente externa, de '
         'modo que detectan incoherencia de cálculo y no error de origen '
-        'en los datos.')
+        'en los datos.'))
 
     resumen = mod_dupont.resumen_verificacion(df)
     identidad_eva = mod_eva.verificar_identidad(
         df, wacc_valor=wacc_valor, **sustitutos)
 
     filas = [
-        {'Comprobación': 'Identidad DuPont nivel 2',
+        {'Comprobación': t('Identidad DuPont nivel 2'),
          'Observaciones': resumen['observaciones'],
          'Satisfacen': resumen['nivel_2_coinciden'],
          'Discrepancia máxima': resumen['diferencia_maxima_nivel_2']},
-        {'Comprobación': 'Identidad DuPont nivel 3',
+        {'Comprobación': t('Identidad DuPont nivel 3'),
          'Observaciones': resumen['observaciones'],
          'Satisfacen': resumen['nivel_3_coinciden'],
          'Discrepancia máxima': resumen['diferencia_maxima_nivel_3']},
-        {'Comprobación': 'Equivalencia de las formulaciones del EVA',
+        {'Comprobación': t('Equivalencia de las formulaciones del EVA'),
          'Observaciones': len(identidad_eva),
          'Satisfacen': int(identidad_eva['Coincide'].sum()),
          'Discrepancia máxima': float(
              identidad_eva['Diferencia relativa'].max())},
     ]
     tabla = pd.DataFrame(filas)
-    tabla['Resultado'] = [
-        'Satisface' if s == o else 'Revisar'
-        for s, o in zip(tabla['Satisfacen'], tabla['Observaciones'])]
+    # El veredicto se decide comparando números y no el texto que se
+    # muestra: ese texto se traduce, y contrastarlo contra una redacción
+    # fija daría por fallida toda comprobación en otro idioma.
+    satisfacen = tabla['Satisfacen'] == tabla['Observaciones']
+    tabla['Resultado'] = [t('Satisface') if ok else t('Revisar')
+                          for ok in satisfacen]
 
-    st.dataframe(tabla.style.format({'Discrepancia máxima': '{:.2e}'}),
+    st.dataframe(_tabla(tabla).format({t('Discrepancia máxima'): '{:.2e}'}),
                  hide_index=True)
 
-    if (tabla['Resultado'] == 'Satisface').all():
-        st.success('Todas las comprobaciones de consistencia interna se '
-                   'satisfacen.')
+    if satisfacen.all():
+        st.success(t('Todas las comprobaciones de consistencia interna se '
+                   'satisfacen.'))
     else:
-        st.error('Alguna comprobación no se satisface. Revise los datos de '
-                 'entrada.')
+        st.error(t('Alguna comprobación no se satisface. Revise los datos de '
+                 'entrada.'))
 
     st.caption(
-        'Las discrepancias del orden de 1e-17 no constituyen error: son el '
+        t('Las discrepancias del orden de 1e-17 no constituyen error: son el '
         'residuo de la aritmética de punto flotante, que no representa los '
-        'números reales con precisión infinita.')
+        'números reales con precisión infinita.'))
 
 
 # ── Composición de la página ─────────────────────────────────────
@@ -633,14 +683,18 @@ def main():
     st.set_page_config(page_title='FinAnalyzer Pro',
                        page_icon='📊', layout='wide')
 
-    st.title('FinAnalyzer Pro')
-    st.caption('Análisis de estados financieros de emisores no financieros '
-               'dominicanos, 2022–2025')
+    selector_idioma()
+
+    st.title(t('FinAnalyzer Pro'))
+    st.caption(t('Análisis de estados financieros de emisores no financieros '
+               'dominicanos, 2022–2025'))
 
     if not ARCHIVO_ENTRADA.exists():
-        st.error(f'No se encontró {ARCHIVO_ENTRADA}.\n\n'
-                 f'Ejecute antes `python -m src.etl` para consolidar las '
-                 f'plantillas.')
+        st.error(
+            t('No se encontró {archivo}.').format(archivo=ARCHIVO_ENTRADA)
+            + '\n\n'
+            + t('Ejecute antes `python -m src.etl` para consolidar las '
+                'plantillas.'))
         st.stop()
 
     try:
@@ -659,9 +713,9 @@ def main():
         seleccion if not seleccion.empty else df)
 
     if seleccion.empty:
-        st.info('No hay ningún emisor seleccionado.\n\n'
+        st.info(t('No hay ningún emisor seleccionado.\n\n'
                 'Elija al menos uno en la barra lateral para ver el '
-                'análisis. Los parámetros del modelo quedan como estaban.')
+                'análisis. Los parámetros del modelo quedan como estaban.'))
         st.stop()
 
     df = seleccion
@@ -670,8 +724,8 @@ def main():
 
     (estructura, indicadores, valor, sensibilidad, costo, riesgo,
      rendimiento, validacion) = st.tabs(
-        ['Estructura', 'Indicadores', 'Valor', 'Sensibilidad',
-         'Costo de capital', 'Riesgo', 'Rendimiento', 'Validación'])
+        [t('Estructura'), t('Indicadores'), t('Valor'), t('Sensibilidad'),
+         t('Costo de capital'), t('Riesgo'), t('Rendimiento'), t('Validación')])
 
     with estructura:
         pestana_estructura(df)
