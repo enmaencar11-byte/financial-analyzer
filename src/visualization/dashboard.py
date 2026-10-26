@@ -99,15 +99,32 @@ CONTROLES = {
 # ── Carga ────────────────────────────────────────────────────────
 
 @st.cache_data(show_spinner='Cargando los estados financieros...')
-def cargar(ruta):
+def cargar(ruta, marca_de_tiempo):
     """
     Lee el conjunto consolidado y le incorpora los parámetros externos.
 
     El resultado queda en memoria entre ejecuciones del script, que
     Streamlit repite cada vez que el usuario mueve un control. Sin esa
     caché, cada movimiento de un deslizador releería los archivos.
+
+    El argumento marca_de_tiempo no se emplea dentro de la función:
+    forma parte de la clave de la caché. Sin él, la caché responde a la
+    ruta y no al contenido, de modo que volver a consolidar las
+    plantillas con el panel abierto dejaba en pantalla los datos
+    anteriores sin aviso alguno. Transcribir los emisores por partes es
+    el uso habitual, y esa combinación —datos nuevos en disco, datos
+    viejos en pantalla— no se advierte hasta que una cifra no concuerda
+    con el documento.
     """
     return incorporar(cargar_datos(ruta))
+
+
+def marca_de(archivo):
+    """Momento de la última modificación de un archivo, o cero si falta."""
+    try:
+        return Path(archivo).stat().st_mtime
+    except OSError:
+        return 0.0
 
 
 def valores_de_archivo(df):
@@ -119,6 +136,25 @@ def valores_de_archivo(df):
     if 'kd' not in base:
         base['kd'] = float(mod_wacc.costo_deuda(df).mean())
     return base
+
+
+def periodo(df):
+    """
+    Describe el período que los datos cubren, como '2022–2025' o '2024'.
+
+    El período se deduce de los datos y no se escribe a mano. Una leyenda
+    fija afirmaría un intervalo que el archivo puede no contener: una
+    plantilla a medio llenar produciría un panel que declara cuatro
+    ejercicios y muestra uno, y la discrepancia pasaría inadvertida
+    precisamente en la herramienta cuyo argumento es que sus cifras se
+    comprueban.
+    """
+    anios = sorted(df['anio'].dropna().unique())
+    if not anios:
+        return ''
+    if len(anios) == 1:
+        return str(int(anios[0]))
+    return f'{int(anios[0])}–{int(anios[-1])}'
 
 
 # ── Idioma ───────────────────────────────────────────────────────
@@ -686,8 +722,6 @@ def main():
     selector_idioma()
 
     st.title(t('FinAnalyzer Pro'))
-    st.caption(t('Análisis de estados financieros de emisores no financieros '
-               'dominicanos, 2022–2025'))
 
     if not ARCHIVO_ENTRADA.exists():
         st.error(
@@ -698,10 +732,21 @@ def main():
         st.stop()
 
     try:
-        df = cargar(str(ARCHIVO_ENTRADA))
+        # Se pasan también las marcas de los archivos de parámetros:
+        # el conjunto resultante depende de los tres.
+        df = cargar(str(ARCHIVO_ENTRADA),
+                    (marca_de(ARCHIVO_ENTRADA),
+                     marca_de(RAIZ / 'data' / 'parametros_mercado.csv'),
+                     marca_de(RAIZ / 'data' / 'parametros_sector.csv')))
     except (FileNotFoundError, ValueError) as error:
         st.error(str(error))
         st.stop()
+
+    # El subtítulo se escribe una vez cargados los datos, porque declara
+    # el período que efectivamente contienen.
+    st.caption(
+        t('Análisis de estados financieros de emisores no financieros '
+          'dominicanos, {periodo}').format(periodo=periodo(df)))
 
     seleccion = seleccionar(df)
 

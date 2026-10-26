@@ -89,9 +89,9 @@ _EN = {
     # Encabezado y navegación
     'FinAnalyzer Pro': 'FinAnalyzer Pro',
     'Análisis de estados financieros de emisores no financieros '
-    'dominicanos, 2022–2025':
+    'dominicanos, {periodo}':
         'Financial statement analysis of Dominican non-financial issuers, '
-        '2022–2025',
+        '{periodo}',
     'Muestra': 'Sample',
     'Emisores': 'Issuers',
     'Ejercicios': 'Fiscal years',

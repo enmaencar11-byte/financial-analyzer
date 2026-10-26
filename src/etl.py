@@ -82,6 +82,11 @@ FILAS_RESULTADOS = {
     31: 'nopat',
 }
 
+# Fila del activo total. Decide si una columna de ejercicio trae datos:
+# una empresa sin activo no existe, de modo que un cero ahí indica
+# columna vacía y no una cifra.
+FILA_ACTIVO_TOTAL = 15
+
 FILA_CUADRE = 35          # Balance General: debe ser 0
 FILA_DISTRIBUCION = 27    # Estado de Resultados: debe ser 0
 TOLERANCIA_CUADRE = 1.0   # margen por redondeo en la unidad declarada
@@ -114,35 +119,62 @@ def _nombre_emisor(libro):
     return str(nombre).strip()
 
 
-def _anios(hoja_balance):
-    """Lee los cuatro ejercicios desde la fila de encabezados."""
-    anios = []
+def _ejercicios(hoja_balance, emisor=''):
+    """
+    Devuelve los ejercicios que la plantilla trae efectivamente llenos,
+    como pares (columna, año).
+
+    Una plantilla se llena por partes: se transcribe un ejercicio, se
+    comprueba, y después los demás. Recorrer siempre las cuatro columnas
+    tenía dos consecuencias, ambas indeseables. Una columna sin año en el
+    encabezado interrumpía la lectura al intentar convertir un valor
+    ausente. Y una columna con año pero sin cifras producía un ejercicio
+    entero en ceros, que es peor que el error: no interrumpe nada y
+    contamina los indicadores con un emisor sin activo, sin ventas y con
+    divisiones por cero.
+
+    Se considera lleno el ejercicio que declara año y presenta activo
+    total distinto de cero.
+    """
+    ejercicios = []
     for col in COLUMNAS_ANIOS:
-        v = hoja_balance.cell(row=FILA_ENCABEZADO_ANIOS, column=col).value
-        anios.append(int(v))
-    return anios
+        anio = hoja_balance.cell(row=FILA_ENCABEZADO_ANIOS, column=col).value
+        if anio is None or str(anio).strip() == '':
+            continue
+        if abs(_valor(hoja_balance, FILA_ACTIVO_TOTAL, col)) < 1e-9:
+            continue
+        ejercicios.append((col, int(anio)))
+
+    if not ejercicios:
+        raise ValueError(
+            f'{emisor or "La plantilla"} no trae ningún ejercicio con datos.\n'
+            f'Compruebe que la fila {FILA_ACTIVO_TOTAL} del Balance General '
+            f'tenga el activo total, y que el archivo se haya abierto y '
+            f'guardado en Excel al menos una vez después de llenarlo: las '
+            f'celdas con fórmula se leen vacías en caso contrario.')
+    return ejercicios
 
 
-def _verificar_cuadre(hoja_balance, emisor, anios):
+def _verificar_cuadre(hoja_balance, emisor, ejercicios):
     """
     Comprueba que activo = pasivo + patrimonio en cada ejercicio.
     Un descuadre indica error de transcripción, no error del emisor.
     """
     errores = []
-    for col, anio in zip(COLUMNAS_ANIOS, anios):
+    for col, anio in ejercicios:
         cuadre = _valor(hoja_balance, FILA_CUADRE, col)
         if abs(cuadre) > TOLERANCIA_CUADRE:
             errores.append(f'  {emisor} {anio}: descuadre de {cuadre:,.2f}')
     return errores
 
-def _verificar_distribucion(hoja_resultados, emisor, anios):
+def _verificar_distribucion(hoja_resultados, emisor, ejercicios):
     """
     Comprueba que la utilidad neta sea igual a la suma de la porción
     atribuible a la controladora y la atribuible a participaciones no
     controladoras. En estados individuales la segunda es cero.
     """
     errores = []
-    for col, anio in zip(COLUMNAS_ANIOS, anios):
+    for col, anio in ejercicios:
         dif = _valor(hoja_resultados, FILA_DISTRIBUCION, col)
         if abs(dif) > TOLERANCIA_CUADRE:
             errores.append(f'  {emisor} {anio}: la distribución del resultado difiere en {dif:,.2f}')
@@ -169,19 +201,19 @@ def leer_plantilla(ruta):
     resultados = libro['Estado de Resultados']
 
     emisor = _nombre_emisor(libro)
-    anios = _anios(balance)
+    ejercicios = _ejercicios(balance, emisor)
 
-    errores = _verificar_cuadre(balance, emisor, anios)
+    errores = _verificar_cuadre(balance, emisor, ejercicios)
     if errores:
         raise ValueError('Descuadre en el balance:\n' + '\n'.join(errores))
 
-    errores = _verificar_distribucion(resultados, emisor, anios)
+    errores = _verificar_distribucion(resultados, emisor, ejercicios)
     if errores:
         raise ValueError('Distribución del resultado inconsistente:\n' + '\n'.join(errores))
  
 
     filas = []
-    for col, anio in zip(COLUMNAS_ANIOS, anios):
+    for col, anio in ejercicios:
         registro = {'empresa': emisor, 'anio': anio}
         for fila, columna in FILAS_BALANCE.items():
             registro[columna] = _valor(balance, fila, col)
