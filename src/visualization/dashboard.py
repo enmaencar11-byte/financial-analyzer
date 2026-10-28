@@ -50,6 +50,11 @@ import streamlit as st
 
 from src.idioma import t
 from src import idioma
+import contextlib
+import io
+import shutil
+
+from src import etl as mod_etl
 from src.analysis import altman as mod_altman
 from src.analysis import capm as mod_capm
 from src.analysis import dupont as mod_dupont
@@ -155,6 +160,216 @@ def periodo(df):
     if len(anios) == 1:
         return str(int(anios[0]))
     return f'{int(anios[0])}–{int(anios[-1])}'
+
+
+# ── Carga de plantillas y parámetros ─────────────────────────────
+
+DIR_PLANTILLAS = RAIZ / 'data' / 'raw'
+ARCHIVO_MERCADO = RAIZ / 'data' / 'parametros_mercado.csv'
+ARCHIVO_SECTOR = RAIZ / 'data' / 'parametros_sector.csv'
+
+
+def _emisores_del_consolidado():
+    """
+    Emisores y ejercicios presentes en el consolidado, sin incorporar los
+    parámetros externos.
+
+    Se lee el archivo en crudo y no mediante la carga habitual porque
+    esta función se emplea, entre otros casos, cuando la incorporación de
+    parámetros ha fallado: necesita decir qué emisores carecen de ellos,
+    y para eso no puede depender de que la incorporación funcione.
+    """
+    if not ARCHIVO_ENTRADA.exists():
+        return pd.DataFrame(columns=['empresa', 'anio'])
+    try:
+        crudo = pd.read_csv(ARCHIVO_ENTRADA)
+    except (OSError, pd.errors.ParserError):
+        return pd.DataFrame(columns=['empresa', 'anio'])
+    return crudo[['empresa', 'anio']]
+
+
+def _consolidar_y_reportar():
+    """
+    Ejecuta la consolidación y devuelve (exito, mensaje).
+
+    El proceso de consolidación escribe su avance por la salida estándar,
+    que en una terminal es el sitio adecuado y en una página web no se ve.
+    Se captura para mostrarla donde el usuario está mirando.
+    """
+    salida = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(salida):
+            mod_etl.consolidar()
+    except (ValueError, FileNotFoundError, KeyError) as error:
+        return False, str(error)
+    except Exception as error:                              # noqa: BLE001
+        return False, f'{type(error).__name__}: {error}'
+    return True, salida.getvalue().strip()
+
+
+def _plantillas_presentes():
+    """Archivos de plantilla que la carpeta de entrada contiene."""
+    if not DIR_PLANTILLAS.exists():
+        return []
+    return sorted(p for p in DIR_PLANTILLAS.glob('*.xlsx')
+                  if not p.name.startswith('~$'))
+
+
+def _guardar_subidas(archivos):
+    """
+    Copia los archivos subidos a la carpeta de plantillas.
+
+    Se conservan en disco y no solo en memoria porque el proceso por
+    lotes, las figuras y el reporte leen de esa carpeta: una plantilla
+    que existiera únicamente dentro del panel haría que la instrucción
+    `python -m src.main` produjera un resultado distinto del que el panel
+    muestra, y entonces ninguna de las dos cifras sería defendible.
+    """
+    DIR_PLANTILLAS.mkdir(parents=True, exist_ok=True)
+    guardados = []
+    for archivo in archivos:
+        destino = DIR_PLANTILLAS / archivo.name
+        with open(destino, 'wb') as salida:
+            shutil.copyfileobj(archivo, salida)
+        guardados.append(destino.name)
+    return guardados
+
+
+def pestana_datos():
+    """
+    Carga de plantillas y de los parámetros que el modelo requiere.
+
+    Reúne en un solo lugar las tres cosas que el sistema necesita antes
+    de calcular: las plantillas de los emisores, los parámetros de
+    mercado por ejercicio y los sectoriales por emisor. Antes exigían
+    manipular carpetas y archivos CSV a mano, que es donde se producen
+    los errores difíciles de diagnosticar: un nombre de emisor con una
+    coma sin comillas, un ejercicio transcrito a medias, un archivo que
+    nunca pasó por Excel y cuyas fórmulas se leen vacías.
+    """
+    st.subheader(t('Datos'))
+
+    # ── Plantillas ───────────────────────────────────────────────
+    st.markdown(f"**{t('Plantillas de los emisores')}**")
+    st.markdown(
+        t('Arrastre aquí las plantillas de Excel, una por emisor. El '
+          'sistema las guarda, las consolida y comprueba el cuadre del '
+          'balance y la distribución del resultado antes de aceptarlas.'))
+
+    subidas = st.file_uploader(
+        t('Plantillas'), type=['xlsx'], accept_multiple_files=True,
+        key='subidas', label_visibility='collapsed',
+        help=t('El archivo debe haberse abierto y guardado en Excel al '
+               'menos una vez después de llenarlo: las celdas con fórmula '
+               'se leen vacías en caso contrario.'))
+
+    if subidas:
+        guardados = _guardar_subidas(subidas)
+        exito, mensaje = _consolidar_y_reportar()
+        if exito:
+            st.success(t('{n} plantilla(s) incorporada(s).').format(
+                n=len(guardados)))
+            if mensaje:
+                st.code(mensaje, language=None)
+            st.cache_data.clear()
+        else:
+            st.error(mensaje)
+            st.warning(
+                t('La plantilla quedó guardada pero no se incorporó. '
+                  'Corrija el archivo y vuelva a subirlo, o elimínelo de '
+                  'la lista.'))
+
+    presentes = _plantillas_presentes()
+    if presentes:
+        st.markdown(f"**{t('Plantillas cargadas')}**")
+        for ruta in presentes:
+            columna_nombre, columna_boton = st.columns([5, 1])
+            columna_nombre.write(f'`{ruta.name}`')
+            if columna_boton.button(t('Eliminar'), key=f'borrar_{ruta.name}'):
+                ruta.unlink(missing_ok=True)
+                exito, mensaje = _consolidar_y_reportar()
+                st.cache_data.clear()
+                if not exito:
+                    st.warning(mensaje)
+                st.rerun()
+    else:
+        st.info(t('Todavía no hay ninguna plantilla cargada.'))
+
+    st.divider()
+
+    # ── Parámetros ───────────────────────────────────────────────
+    datos = _emisores_del_consolidado()
+    if datos.empty:
+        return
+
+    st.markdown(f"**{t('Parámetros del modelo de costo de capital')}**")
+    st.markdown(
+        t('El sistema no calcula un costo de capital sobre parámetros '
+          'ausentes: se detiene e indica cuál falta. Complételos aquí.'))
+
+    izquierda, derecha = st.columns(2)
+
+    with izquierda:
+        st.markdown(f"**{t('Por ejercicio')}**")
+        anios = sorted(datos['anio'].unique())
+        if ARCHIVO_MERCADO.exists():
+            mercado = pd.read_csv(ARCHIVO_MERCADO)
+        else:
+            mercado = pd.DataFrame(columns=['anio', 'tasa_libre_riesgo',
+                                            'prima_riesgo_mercado',
+                                            'prima_riesgo_pais'])
+        mercado = (pd.DataFrame({'anio': anios})
+                   .merge(mercado, on='anio', how='left'))
+        editado_mercado = st.data_editor(
+            mercado, hide_index=True, num_rows='fixed', key='ed_mercado',
+            column_config={
+                'anio': st.column_config.NumberColumn(t('Ejercicio'),
+                                                      disabled=True,
+                                                      format='%d'),
+                'tasa_libre_riesgo': st.column_config.NumberColumn(
+                    t('Tasa libre de riesgo'), format='%.4f'),
+                'prima_riesgo_mercado': st.column_config.NumberColumn(
+                    t('Prima de riesgo de mercado'), format='%.4f'),
+                'prima_riesgo_pais': st.column_config.NumberColumn(
+                    t('Prima de riesgo país'), format='%.4f')})
+        if st.button(t('Guardar parámetros de mercado')):
+            editado_mercado.to_csv(ARCHIVO_MERCADO, index=False)
+            st.cache_data.clear()
+            st.success(t('Guardado.'))
+            st.rerun()
+
+    with derecha:
+        st.markdown(f"**{t('Por emisor')}**")
+        emisores = sorted(datos['empresa'].unique())
+        if ARCHIVO_SECTOR.exists():
+            sector = pd.read_csv(ARCHIVO_SECTOR)
+        else:
+            sector = pd.DataFrame(columns=['empresa', 'sector',
+                                           'beta_desapalancado'])
+        # Los nombres provienen de los datos y no se escriben a mano: la
+        # coincidencia debe ser exacta, y un nombre con coma transcrito
+        # sin comillas en el archivo era la causa más frecuente de que un
+        # parámetro pareciera ausente estando presente.
+        sector = (pd.DataFrame({'empresa': emisores})
+                  .merge(sector, on='empresa', how='left'))
+        editado_sector = st.data_editor(
+            sector, hide_index=True, num_rows='fixed', key='ed_sector',
+            column_config={
+                'empresa': st.column_config.TextColumn(t('Emisor'),
+                                                       disabled=True),
+                'sector': st.column_config.TextColumn(t('Sector')),
+                'beta_desapalancado': st.column_config.NumberColumn(
+                    t('Beta desapalancado'), format='%.4f')})
+        if st.button(t('Guardar parámetros sectoriales')):
+            editado_sector.to_csv(ARCHIVO_SECTOR, index=False)
+            st.cache_data.clear()
+            st.success(t('Guardado.'))
+            st.rerun()
+
+    st.caption(
+        t('Los parámetros son estimaciones y constituyen decisiones '
+          'metodológicas: registre la fuente y su fecha, porque un costo '
+          'de capital sin ellas no es verificable.'))
 
 
 # ── Idioma ───────────────────────────────────────────────────────
@@ -723,12 +938,13 @@ def main():
 
     st.title(t('FinAnalyzer Pro'))
 
+    # Sin datos no hay panel, pero sí hay algo que hacer: cargarlos. La
+    # pestaña de datos se presenta sola, de modo que el sistema sea
+    # utilizable desde una instalación limpia sin recurrir a la terminal.
     if not ARCHIVO_ENTRADA.exists():
-        st.error(
-            t('No se encontró {archivo}.').format(archivo=ARCHIVO_ENTRADA)
-            + '\n\n'
-            + t('Ejecute antes `python -m src.etl` para consolidar las '
-                'plantillas.'))
+        st.info(t('Todavía no hay datos cargados. Suba al menos una '
+                  'plantilla para comenzar.'))
+        pestana_datos()
         st.stop()
 
     try:
@@ -736,10 +952,14 @@ def main():
         # el conjunto resultante depende de los tres.
         df = cargar(str(ARCHIVO_ENTRADA),
                     (marca_de(ARCHIVO_ENTRADA),
-                     marca_de(RAIZ / 'data' / 'parametros_mercado.csv'),
-                     marca_de(RAIZ / 'data' / 'parametros_sector.csv')))
+                     marca_de(ARCHIVO_MERCADO),
+                     marca_de(ARCHIVO_SECTOR)))
     except (FileNotFoundError, ValueError) as error:
+        # Un parámetro ausente se corrige desde la misma pestaña que lo
+        # declara: interrumpir sin ofrecer dónde arreglarlo obligaba a
+        # editar archivos CSV a mano, que es donde se originaba el error.
         st.error(str(error))
+        pestana_datos()
         st.stop()
 
     # El subtítulo se escribe una vez cargados los datos, porque declara
@@ -768,10 +988,13 @@ def main():
     st.divider()
 
     (estructura, indicadores, valor, sensibilidad, costo, riesgo,
-     rendimiento, validacion) = st.tabs(
+     rendimiento, validacion, datos) = st.tabs(
         [t('Estructura'), t('Indicadores'), t('Valor'), t('Sensibilidad'),
-         t('Costo de capital'), t('Riesgo'), t('Rendimiento'), t('Validación')])
+         t('Costo de capital'), t('Riesgo'), t('Rendimiento'),
+         t('Validación'), t('Datos')])
 
+    with datos:
+        pestana_datos()
     with estructura:
         pestana_estructura(df)
     with indicadores:

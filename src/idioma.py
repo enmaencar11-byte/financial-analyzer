@@ -399,6 +399,57 @@ _EN = {
         'RESULT BY ISSUER AND FISCAL YEAR',
     'Juicio EVA': 'EVA verdict',
 
+    # Carga de plantillas y parámetros
+    'Datos': 'Data',
+    'Emisor': 'Issuer',
+    'Sector': 'Sector',
+    'Eliminar': 'Remove',
+    'Guardado.': 'Saved.',
+    'Plantillas': 'Templates',
+    'Por emisor': 'By issuer',
+    'Por ejercicio': 'By fiscal year',
+    'Plantillas cargadas': 'Loaded templates',
+    'Plantillas de los emisores': 'Issuer templates',
+    'Guardar parámetros de mercado': 'Save market parameters',
+    'Guardar parámetros sectoriales': 'Save sector parameters',
+    '{n} plantilla(s) incorporada(s).': '{n} template(s) loaded.',
+    'Todavía no hay ninguna plantilla cargada.':
+        'No template has been loaded yet.',
+    'Parámetros del modelo de costo de capital':
+        'Cost of capital model parameters',
+    'Todavía no hay datos cargados. Suba al menos una plantilla para '
+    'comenzar.':
+        'No data has been loaded yet. Upload at least one template to '
+        'begin.',
+    'La plantilla quedó guardada pero no se incorporó. Corrija el archivo '
+    'y vuelva a subirlo, o elimínelo de la lista.':
+        'The template was saved but not loaded. Correct the file and '
+        'upload it again, or remove it from the list.',
+    'El sistema no calcula un costo de capital sobre parámetros ausentes: '
+    'se detiene e indica cuál falta. Complételos aquí.':
+        'The system does not compute a cost of capital on missing '
+        'parameters: it stops and names the one that is absent. Fill them '
+        'in here.',
+    'El archivo debe haberse abierto y guardado en Excel al menos una vez '
+    'después de llenarlo: las celdas con fórmula se leen vacías en caso '
+    'contrario.':
+        'The file must have been opened and saved in Excel at least once '
+        'after being filled in: cells containing formulas read as empty '
+        'otherwise.',
+    'Los parámetros son estimaciones y constituyen decisiones '
+    'metodológicas: registre la fuente y su fecha, porque un costo de '
+    'capital sin ellas no es verificable.':
+        'The parameters are estimates and constitute methodological '
+        'decisions: record the source and its date, because a cost of '
+        'capital without them is not verifiable.',
+    'Arrastre aquí las plantillas de Excel, una por emisor. El sistema las '
+    'guarda, las consolida y comprueba el cuadre del balance y la '
+    'distribución del resultado antes de aceptarlas.':
+        'Drop the Excel templates here, one per issuer. The system saves '
+        'them, consolidates them and checks that the balance sheet '
+        'balances and the result is correctly distributed before '
+        'accepting them.',
+
     # Ayudas de los controles de parámetro
     'Rendimiento del bono del Tesoro de los Estados Unidos.':
         'Yield on United States Treasury bonds.',
